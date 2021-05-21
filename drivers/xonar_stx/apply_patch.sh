@@ -42,7 +42,7 @@ if [[ ! -f "$modules_path/build/Module.symvers" ]]; then
 fi
 
 if [[ ! -f "xonar_pcm179x.c.patch" ]]; then
-    wget "https://gist.githubusercontent.com/kevinlekiller/f533f4d1f7318a7cf81a/raw/xonar_pcm179x.c.patch"
+    wget "https://github.com/kevinlekiller/shell_scripts/raw/main/drivers/xonar_stx/xonar_pcm179x.c.patch"
     if [[ $? != 0 ]] || [[ ! -f "xonar_pcm179x.c.patch" ]]; then
         echo "Error: Problem downloading kernel patch."
         exit 1
