@@ -29,17 +29,13 @@ elif which yay &> /dev/null; then
 elif which pacman &> /dev/null; then
     sudo pacman -Syu
 elif which apt &> /dev/nulll; then
-    sudo apt update
-    sudo apt upgrade
+    sudo apt update && sudo apt upgrade
 elif which dnf &> /dev/null; then
-    sudo dnf upgrade
-    sudo dns autoremove
+    sudo dnf upgrade && sudo dns autoremove
 elif which yum &> /dev/null; then
-    sudo yum check-update
-    sudo yum update
+    sudo yum check-update && sudo yum update
 elif which emerge &> /dev/null; then
-    sudo emerge --sync
-    sudo emerge --update --deep --with-bdeps=y @world
+    sudo emerge --sync && sudo emerge --update --deep --with-bdeps=y @world
 fi
 echo "Done upgrading distro packages."
 if which journalctl &> /dev/null; then
