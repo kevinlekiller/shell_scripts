@@ -1,0 +1,13 @@
+#cat /etc/systemd/system/gpufancontrol.service 
+[Unit]
+Description=Controls the fanspeed of the AMD GPU.
+
+[Service]
+ExecStart=/usr/local/sbin/amdgpufancontrol.sh
+Type=simple
+Restart=always
+RestartSec=5
+After=graphical.target
+
+[Install]
+WantedBy=graphical.target
