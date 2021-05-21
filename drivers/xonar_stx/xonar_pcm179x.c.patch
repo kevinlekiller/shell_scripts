@@ -1,0 +1,41 @@
+--- linux-4.4.17/sound/pci/oxygen/xonar_pcm179x.c	2016-08-10 05:49:43.000000000 -0400
++++ linux-4.4.17/sound/pci/oxygen/xonar_pcm179x.c	2016-08-18 18:40:53.814312616 -0400
+@@ -430,11 +430,14 @@
+ 	oxygen_set_bits16(chip, OXYGEN_GPIO_CONTROL,
+ 			  GPIO_INPUT_ROUTE | GPIO_ST_HP_REAR |
+ 			  GPIO_ST_MAGIC | GPIO_ST_HP);
+-	oxygen_clear_bits16(chip, OXYGEN_GPIO_DATA,
+-			    GPIO_INPUT_ROUTE | GPIO_ST_HP_REAR | GPIO_ST_HP);
++	// From what I gather, all this does is resets the output to speakers, which clicks a relay for no reason.
++	/*oxygen_clear_bits16(chip, OXYGEN_GPIO_DATA,
++			    GPIO_INPUT_ROUTE | GPIO_ST_HP_REAR | GPIO_ST_HP);*/
+ 
+ 	xonar_init_cs53x1(chip);
+-	xonar_enable_output(chip);
++	// Do not enable the DATA right now, only the CONTROL, we will enable the DATA later, otherwise we get the POP.
++	//xonar_enable_output(chip);
++	oxygen_set_bits16(chip, OXYGEN_GPIO_CONTROL, data->generic.output_enable_bit);
+ 
+ 	snd_component_add(chip->card, "PCM1792A");
+ 	snd_component_add(chip->card, "CS5381");
+@@ -834,9 +837,20 @@
+ 		gpio = (gpio | GPIO_ST_HP) & ~GPIO_ST_HP_REAR;
+ 		break;
+ 	}
++	// Disable the output.
++	oxygen_clear_bits16(chip, OXYGEN_GPIO_DATA, data->generic.output_enable_bit);
++	msleep(data->generic.anti_pop_delay);
++	gpio &= ~GPIO_ST_OUTPUT_ENABLE;
++
+ 	oxygen_write16(chip, OXYGEN_GPIO_DATA, gpio);
+ 	data->hp_active = gpio & GPIO_ST_HP;
+ 	update_pcm1796_volume(chip);
++
++	// Undo the change to gpio for the return, enable the output.
++	gpio &= GPIO_ST_OUTPUT_ENABLE;
++	msleep(data->generic.anti_pop_delay);
++	oxygen_set_bits16(chip, OXYGEN_GPIO_DATA, data->generic.output_enable_bit);
++
+ 	mutex_unlock(&chip->mutex);
+ 	return gpio != gpio_old;
+ }
