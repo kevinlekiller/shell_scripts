@@ -1,5 +1,20 @@
 #!/bin/bash
 
+trap catchExit SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
+function catchExit() {
+    [[ -z $1 ]] && exit 0 || exit "$1"
+}
+
+if [[ ! -t 0 ]]; then
+    for term in konsole gnome-terminal xfce4-terminal lxterminal xterm; do
+        wTerm=$(which $term 2> /dev/null)
+        if [[ -n $wTerm ]]; then
+            eval "$wTerm" -e "$0"
+            exit $?
+        fi
+    done
+fi
+
 if which pipx &> /dev/null; then
     echo "Upgrading pip packages"
     pipx upgrade-all
@@ -28,7 +43,7 @@ elif which yay &> /dev/null; then
     yay -Syu
 elif which pacman &> /dev/null; then
     sudo pacman -Syu
-elif which apt &> /dev/nulll; then
+elif which apt &> /dev/null; then
     sudo apt update && sudo apt upgrade
 elif which dnf &> /dev/null; then
     sudo dnf upgrade && sudo dns autoremove
@@ -52,3 +67,6 @@ echo "Cleaning ~/.xession-errors"
 rm -rf ~/.xsession-errors*
 echo "Cleaning ~/.lesshs"
 rm -rf ~/.lesshs*
+rm -f ~/.y2log
+
+read -rp 'Done. Press any key to exit... '
