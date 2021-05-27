@@ -205,7 +205,7 @@ for inFile in **; do
             if [[ $DEINTERLACEDELETE == 1 ]]; then
                 echo "$ouFile" >> "$DEINTERLACELOG"
             else
-                echo -e "$inFile  ->  $ouFile" >> "$DEINTERLACELOG"
+                echo "$inFile  ->  $ouFile" >> "$DEINTERLACELOG"
             fi
         fi
     else
