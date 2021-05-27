@@ -66,6 +66,22 @@ function catchExit() {
     exit 0
 }
 
+if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
+    FFMPEGNICE=20
+fi
+
+if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
+    MININHEIGHT=900
+fi
+if [[ ! $OUTHEIGHT =~ ^[0-9]*$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
+    OUTHEIGHT=720
+fi
+if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
+    echo -e "Time\tInput File\tInput File Size\tOutput File\tOutput File Size\tConversion time" > "$CONVERSIONLOG"
+fi
+
+cd "$1" || exit
+
 function checkDeinterlace {
     if [[ -z $DEINTERLACE ]]; then
         return
@@ -85,44 +101,45 @@ function checkDeinterlace {
     done
 }
 
-if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
-    FFMPEGNICE=20
-fi
+echoColors=$(tput colors 2> /dev/null)
+[[ -n $echoColors && $echoColors -ge 8 ]] && echoColors=1 || echoColors=0
+function echoCol {
+    if [[ $echoColors != 1 ]]; then
+        echo "$1"
+        return
+    fi
+    case $2 in
+        red) echo -ne "\e[31m";;
+        green) echo -ne "\e[32m";;
+        brown) echo -ne "\e[33m";;
+        blue) echo -ne "\e[34m";;
+    esac
+    echo -e "$1\e[0m"
+}
 
-if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
-    MININHEIGHT=900
-fi
-if [[ ! $OUTHEIGHT =~ ^[0-9]*$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
-    OUTHEIGHT=720
-fi
-if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
-    echo -e "Time\tInput File\tInput File Size\tOutput File\tOutput File Size\tConversion time" > "$CONVERSIONLOG"
-fi
-
-cd "$1" || exit
 shopt -s globstar
 for inFile in **; do
     if [[ ! -f $inFile ]]; then
         continue
     fi
     if [[ $inFile =~ $SKIPFILEMATCH ]]; then
-        echo "Skipping file \"$inFile\". Matched on \"$SKIPFILEMATCH\"."
+        echoCol "Skipping file \"$inFile\". Matched on \"$SKIPFILEMATCH\"." "blue"
         continue
     fi
     ouFile=$(echo "$inFile" | sed -E "s/ (360|480|540|720|1080|2160)[pр]//" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
     if [[ -f $SKIPFILELOG ]]; then
         if grep -Fxq  "$ouFile" "$SKIPFILELOG" || grep -Fxq "$inFile" "$SKIPFILELOG"; then
-            echo "Already converted \"$inFile\". Skipping."
+            echoCol "Already converted \"$inFile\". Skipping." "blue"
             continue
         fi
     fi
     if [[ -f $LOWLOG ]] && grep -Fxq  "$inFile" "$LOWLOG"; then
-        echo "Resolution too low: \"$inFile\". Skipping."
+        echoCol "Resolution too low: \"$inFile\". Skipping." "blue"
         continue
     fi
     details=$(ffprobe -hide_banner -show_entries stream=height,codec_name "$inFile" 2>&1)
     if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
-        echo "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping."
+        echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
         if [[ -n $SKIPFILELOG ]]; then
             if [[ ! $ouFile =~ "HEVC 720p HEVC" ]]; then
                 echo "$ouFile" >> "$SKIPFILELOG"
@@ -133,7 +150,7 @@ for inFile in **; do
     fi
     height=$(echo "$details" | grep -Po "height=\d+" | cut -d= -f2)
     if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
-        echo "Resolution of video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\""
+        echoCol "Resolution of video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
         if [[ -n $LOWLOG ]]; then
             echo "$inFile" >> "$LOWLOG"
         fi
@@ -143,9 +160,9 @@ for inFile in **; do
     DETECTEDINTERLACE=0
     checkDeinterlace
     START=$(date +%s)
-    echo "Converting \"$inFile\" to \"$ouFile\". File $(echo "$details" | grep -Po "Duration: [\d:.]+")"
+    echoCol "Converting \"$inFile\" to \"$ouFile\". File $(echo "$details" | grep -Po "Duration: [\d:.]+")" "brown"
     if [[ $DETECTEDINTERLACE == 1 ]]; then
-        echo "Video has been detected to be interlaced."
+        echoCol "Video has been detected to be interlaced." "brown"
     fi
     nice -n $FFMPEGNICE ffmpeg \
         -loglevel error \
@@ -163,9 +180,9 @@ for inFile in **; do
         ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
         origSize=$(stat --format=%s "$inFile")
         endSize=$(stat --format=%s "$ouFile")
-        echo "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB."
+        echoCol "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB." "green"
         if [[ $SIZECHECK == 1 ]] && [[ $endSize -ge $origSize ]]; then
-            echo "New file is larger than original file. Deleting new file."
+            echoCol "New file is larger than original file. Deleting new file." "red"
             rm "$ouFile"
             echo "$inFile" >> "$SKIPFILELOG"
             continue
@@ -175,7 +192,7 @@ for inFile in **; do
         fi
         if [[ $DELINFIL -eq 1 ]]; then
             if [[ $DETECTEDINTERLACE == 0 ]] || [[ $DETECTEDINTERLACE == 1 && $DEINTERLACEDELETE == 1 ]]; then
-                echo "Deleting input file \"$inFile\"."
+                echoCol "Deleting input file \"$inFile\"." "blue"
                 rm "$inFile"
             fi
         elif [[ -n $SKIPFILELOG ]]; then
@@ -193,6 +210,6 @@ for inFile in **; do
         fi
     else
         rm -f "$ouFile"
-        echo "Failed to convert video \"$inFile\"."
+        echoCol "Failed to convert video \"$inFile\"." "red"
     fi
 done
