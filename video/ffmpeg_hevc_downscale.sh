@@ -53,8 +53,11 @@ DEINTERLACE=${DEINTERLACE:-yadif=1}
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
 DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
-# If the new file is bigger than the original file, delete the new file and add the original file to SKIPFILELOG
-SIZECHECK=${SIZECHECK:-1}
+# The new file must be at least this percentage smaller than the original file.
+# Deletes the new file and add the original file to SKIPFILELOG
+# For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
+# Set to 0 to disable
+SIZECHECK=${SIZECHECK:-5}
 
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
@@ -69,7 +72,6 @@ function catchExit() {
 if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
     FFMPEGNICE=20
 fi
-
 if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
     MININHEIGHT=900
 fi
@@ -78,6 +80,12 @@ if [[ ! $OUTHEIGHT =~ ^[0-9]*$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
 fi
 if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
     echo -e "Time\tInput File\tInput File Size\tOutput File\tOutput File Size\tConversion time" > "$CONVERSIONLOG"
+fi
+if [[ ! $SIZECHECK =~ ^[0-9]*$ ]] || [[ $SIZECHECK -lt 1 ]]; then
+    SIZECHECK=0
+fi
+if [[ $SIZECHECK -gt 100 ]]; then
+    SIZECHECK=100
 fi
 
 cd "$1" || exit
@@ -181,8 +189,9 @@ for inFile in **; do
         origSize=$(stat --format=%s "$inFile")
         endSize=$(stat --format=%s "$ouFile")
         echoCol "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB." "green"
-        if [[ $SIZECHECK == 1 ]] && [[ $endSize -ge $origSize ]]; then
-            echoCol "New file is larger than original file. Deleting new file." "red"
+        maxSize=$((origSize-origSize*SIZECHECK/100))
+        if [[ $SIZECHECK != 0 ]] && [[ $endSize -ge $maxSize ]]; then
+            echoCol "New file exceeds size check threshold ($SIZECHECK% -> $((maxSize/1024/1024))MiB). Deleting new file." "red"
             rm "$ouFile"
             echo "$inFile" >> "$SKIPFILELOG"
             continue
