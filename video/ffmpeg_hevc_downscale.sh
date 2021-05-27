@@ -42,10 +42,17 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=3}
 # vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:-scale=-2:$OUTHEIGHT:flags=lanczos}
-# Log file to put files that are too low res, on future runs on the script they are skipped.
+# If a file is too low res, log it here, it will be skipped on the next run.
 LOWLOG=${LOWLOG:-~/.config/ffmpeg_downscale.low}
-# Succesfully completed files are logged here.
+# Log converted files to this file:
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
+# Checks if video is interlaced and deinterlaces it.
+# Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
+DEINTERLACE=${DEINTERLACE:-yadif=1}
+# Log of files that have been deinterlaced.
+DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
+# (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
+DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
@@ -55,6 +62,37 @@ fi
 trap catchExit SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
 function catchExit() {
     exit 0
+}
+
+function checkDeinterlace {
+    if [[ -z $DEINTERLACE ]]; then
+        return
+    fi
+    idetData="$(ffmpeg -hide_banner -vf select="between(n\,100\,300),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f rawvideo -y /dev/null -i "$inFile" 2>&1)"
+    for fieldType in "Single" "Multi"; do
+        for fieldOrder in "TFF" "BFF"; do
+            if [[ $(echo "$idetData" | grep -Po "$fieldType frame detection:.*" | grep -Po "$fieldOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
+                DETECTEDINTERLACE=1
+                break 2
+            fi
+        done
+    done
+    if [[ $DETECTEDINTERLACE == 0 ]]; then
+        for fieldOrder in "Top" "Bottom"; do
+            if [[ $(echo "$idetData" | grep -Po "Repeated Fields:.*" | grep -Po "$fieldOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
+                DETECTEDINTERLACE=1
+                break
+            fi
+        done
+    fi
+    if [[ $DETECTEDINTERLACE == 1 ]]; then
+        if [[ -n $VFTEMP ]]; then
+            VFTEMP="$VFTEMP,$DEINTERLACE"
+        else
+            VFTEMP="$DEINTERLACE"
+        fi
+        echo "Video has been detected to be interlaced."
+    fi
 }
 
 if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
@@ -111,13 +149,16 @@ for inFile in **; do
         fi
         continue
     fi
+    VFTEMP="$FFMPEGVF"
+    DETECTEDINTERLACE=0
+    checkDeinterlace
     START=$(date +%s)
     echo "Converting \"$inFile\" to \"$ouFile\". File $(echo "$details" | grep -Po "Duration: [\d:.]+")"
     nice -n $FFMPEGNICE ffmpeg \
         -loglevel error \
         -stats -hide_banner -y \
         -i "$inFile" \
-        -vf "$FFMPEGVF" \
+        -vf "$VFTEMP" \
         -c:v libx265 \
         $FFMPEGEXTRA \
         -preset "$FFMPEGPRESET" \
@@ -134,13 +175,22 @@ for inFile in **; do
             echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
         fi
         if [[ $DELINFIL -eq 1 ]]; then
-            echo "Deleting input file \"$inFile\"."
-            rm "$inFile"
+            if [[ $DETECTEDINTERLACE == 0 ]] || [[ $DETECTEDINTERLACE == 1 && $DEINTERLACEDELETE == 1 ]]; then
+                echo "Deleting input file \"$inFile\"."
+                rm "$inFile"
+            fi
         elif [[ -n $SKIPFILELOG ]]; then
             echo "$inFile" >> "$SKIPFILELOG"
         fi
         if [[ -n $SKIPFILELOG ]]; then
             echo "$ouFile" >> "$SKIPFILELOG"
+        fi
+        if [[ $DETECTEDINTERLACE == 1 && -n $DEINTERLACELOG ]]; then
+            if [[ $DEINTERLACEDELETE == 1 ]]; then
+                echo "$ouFile" >> "$DEINTERLACELOG"
+            else
+                echo -e "$inFile  ->  $ouFile" >> "$DEINTERLACELOG"
+            fi
         fi
     else
         rm -f "$ouFile"
