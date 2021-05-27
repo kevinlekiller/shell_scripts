@@ -53,6 +53,8 @@ DEINTERLACE=${DEINTERLACE:-yadif=1}
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
 DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
+# If the new file is bigger than the original file, delete the new file and add the original file to SKIPFILELOG
+SIZECHECK=${SIZECHECK:-1}
 
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
@@ -72,27 +74,15 @@ function checkDeinterlace {
     for fieldType in "Single" "Multi"; do
         for fieldOrder in "TFF" "BFF"; do
             if [[ $(echo "$idetData" | grep -Po "$fieldType frame detection:.*" | grep -Po "$fieldOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
-                DETECTEDINTERLACE=1
-                break 2
+                if [[ -n $VFTEMP ]]; then
+                    VFTEMP="$VFTEMP,$DEINTERLACE"
+                else
+                    VFTEMP="$DEINTERLACE"
+                fi
+                return
             fi
         done
     done
-    if [[ $DETECTEDINTERLACE == 0 ]]; then
-        for fieldOrder in "Top" "Bottom"; do
-            if [[ $(echo "$idetData" | grep -Po "Repeated Fields:.*" | grep -Po "$fieldOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
-                DETECTEDINTERLACE=1
-                break
-            fi
-        done
-    fi
-    if [[ $DETECTEDINTERLACE == 1 ]]; then
-        if [[ -n $VFTEMP ]]; then
-            VFTEMP="$VFTEMP,$DEINTERLACE"
-        else
-            VFTEMP="$DEINTERLACE"
-        fi
-        echo "Video has been detected to be interlaced."
-    fi
 }
 
 if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
@@ -154,6 +144,9 @@ for inFile in **; do
     checkDeinterlace
     START=$(date +%s)
     echo "Converting \"$inFile\" to \"$ouFile\". File $(echo "$details" | grep -Po "Duration: [\d:.]+")"
+    if [[ $DETECTEDINTERLACE == 1 ]]; then
+        echo "Video has been detected to be interlaced."
+    fi
     nice -n $FFMPEGNICE ffmpeg \
         -loglevel error \
         -stats -hide_banner -y \
@@ -168,9 +161,15 @@ for inFile in **; do
         "$ouFile"
     if [[ $? == 0 ]]; then
         ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
-        origSize=$(du -h "$inFile" | grep -Po "^\S+")
-        endSize=$(du -h "$ouFile" | grep -Po "^\S+")
-        echo "Finished converting in $ENDT. Orignal size: $origSize, new size: $endSize."
+        origSize=$(stat --format=%s "$inFile")
+        endSize=$(stat --format=%s "$ouFile")
+        echo "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB."
+        if [[ $SIZECHECK == 1 ]] && [[ $endSize -ge $origSize ]]; then
+            echo "New file is larger than original file. Deleting new file."
+            rm "$ouFile"
+            echo "$inFile" >> "$SKIPFILELOG"
+            continue
+        fi
         if [[ -n $CONVERSIONLOG ]]; then
             echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
         fi
