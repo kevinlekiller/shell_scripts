@@ -1,4 +1,7 @@
 #!/bin/bash
 
-kquitapp5 plasmashell
-kstart5 plasmashell 2> /dev/null
+kquitapp5 plasmashell &> /dev/null
+if pgrep plasmashell$ &> /dev/null; then
+    pkill plasmashell$
+fi
+kstart5 plasmashell &> /dev/null
