@@ -72,7 +72,7 @@ if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE
     FFMPEGNICE=20
 fi
 if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
-    MININHEIGHT=900
+    MININHEIGHT=800
 fi
 if [[ ! $OUTHEIGHT =~ ^[0-9]*$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
     OUTHEIGHT=720
