@@ -94,10 +94,10 @@ function checkDeinterlace {
     if [[ -z $DEINTERLACE ]]; then
         return
     fi
-    idetData="$(ffmpeg -hide_banner -vf select="between(n\,100\,300),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f rawvideo -y /dev/null -i "$inFile" 2>&1)"
-    for fieldType in "Single" "Multi"; do
-        for fieldOrder in "TFF" "BFF"; do
-            if [[ $(echo "$idetData" | grep -Po "$fieldType frame detection:.*" | grep -Po "$fieldOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
+    idetData="$(ffmpeg -hide_banner -vf select="between(n\,900\,1100),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f null - -i "$inFile" 2>&1)"
+    for frameType in "Single" "Multi"; do
+        for frameOrder in "TFF" "BFF"; do
+            if [[ $(echo "$idetData" | grep -Po "$frameType frame detection:.*" | grep -Po "$frameOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
                 if [[ -n $VFTEMP ]]; then
                     VFTEMP="$VFTEMP,$DEINTERLACE"
                 else
@@ -145,7 +145,7 @@ for inFile in **; do
         echoCol "Resolution too low: \"$inFile\". Skipping." "blue"
         continue
     fi
-    details=$(ffprobe -hide_banner -show_entries stream=height,codec_name "$inFile" 2>&1)
+    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=height,codec_name "$inFile" 2>&1)
     if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
         echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
         if [[ -n $SKIPFILELOG ]]; then
