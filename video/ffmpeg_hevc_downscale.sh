@@ -58,6 +58,7 @@ DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 # For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
 # Set to 0 to disable
 SIZECHECK=${SIZECHECK:-5}
+
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
     exit 1
@@ -134,6 +135,9 @@ for inFile in **; do
         continue
     fi
     ouFile=$(echo "$inFile" | sed -E "s/ (360|480|540|720|1080|2160)[pр]//" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
+    if [[ "$inFile" == "$ouFile" ]]; then
+        ouFile="${ouFile}_"
+    fi
     if [[ -f $SKIPFILELOG ]]; then
         if grep -Fxq  "$ouFile" "$SKIPFILELOG" || grep -Fxq "$inFile" "$SKIPFILELOG"; then
             echoCol "Already converted \"$inFile\". Skipping." "blue"
