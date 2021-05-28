@@ -26,7 +26,7 @@ DELINFIL=${DELINFIL:-1}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
 # Minimun video height to convert video.
-MININHEIGHT=${MININHEIGHT:-900}
+MININHEIGHT=${MININHEIGHT:-800}
 # Desired height of the output video in pixels.
 OUTHEIGHT=${OUTHEIGHT:-720}
 # File to store paths to files that have been already converted to
@@ -58,7 +58,6 @@ DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 # For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
 # Set to 0 to disable
 SIZECHECK=${SIZECHECK:-5}
-
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
     exit 1
@@ -177,12 +176,11 @@ for inFile in **; do
         -stats -hide_banner -y \
         -i "$inFile" \
         -vf "$VFTEMP" \
+        -c copy \
         -c:v libx265 \
         $FFMPEGEXTRA \
         -preset "$FFMPEGPRESET" \
         -crf "$FFMPEGCRF" \
-        -c:a copy \
-        -c:s copy \
         "$ouFile"
     if [[ $? == 0 ]]; then
         ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
