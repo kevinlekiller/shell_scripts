@@ -40,13 +40,17 @@ OUTHEIGHT=${OUTHEIGHT:-720}
 # File to store paths to files that have been already converted to
 # speed up conversion if script has already been run.
 SKIPFILELOG=${SKIPFILELOG:-~/.config/ffmpeg_downscale.done}
-# Niceness to set ffmpeg to, 20 is lowest priority.
-FFMPEGNICE=${FFMPEGNICE:-20}
+# Niceness to set ffmpeg to, 19 is lowest priority.
+FFMPEGNICE=${FFMPEGNICE:-19}
+# Set the amount of threads used by ffmpeg. Setting to 0, ffmpeg will automatically use the optimal amount of threads.
+FFMPEGTHREADS=${FFMPEGTHREADS:-0}
 # lixb265 CRF value ; ffmpeg default is 28, lower number results in higher image quality
 FFMPEGCRF=${FFMPEGCRF:-20}
 # libx265 preset value ; ffmpeg default is medium ; see x265 manual for valid values
 FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
+# You can limit the amount of threads x265 uses with the pools parameter
+# For example -x265-params log-level=error:aq-mode=3:pools=2
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=3}
 # vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:-scale=-2:$OUTHEIGHT:flags=lanczos}
@@ -75,8 +79,11 @@ function catchExit() {
     exit 0
 }
 
-if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
-    FFMPEGNICE=20
+if [[ ! $FFMPEGTHREADS =~ ^[0-9]*$ ]] || [[ $FFMPEGTHREADS -lt 0 ]]; then
+    FFMPEGTHREADS=0
+fi
+if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 19 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
+    FFMPEGNICE=19
 fi
 if [[ ! $MINBITRATE =~ ^[0-9]*$ ]] || [[ $MINBITRATE -lt 1 ]]; then
     MINBITRATE=3000
@@ -212,6 +219,7 @@ for inFile in **; do
         $FFMPEGEXTRA \
         -preset "$FFMPEGPRESET" \
         -crf "$FFMPEGCRF" \
+        -threads "$FFMPEGTHREADS" \
         "$ouFile"
     if [[ $? == 0 ]]; then
         ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
