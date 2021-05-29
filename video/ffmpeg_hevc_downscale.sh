@@ -110,7 +110,7 @@ function checkDeinterlace {
     if [[ -z $DEINTERLACE ]]; then
         return
     fi
-    idetData="$(ffmpeg -hide_banner -vf select="between(n\,900\,1100),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f null - -i "$inFile" 2>&1)"
+    idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,1100),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f null - -i "$inFile" 2>&1)"
     for frameType in "Single" "Multi"; do
         for frameOrder in "TFF" "BFF"; do
             if [[ $(echo "$idetData" | grep -Po "$frameType frame detection:.*" | grep -Po "$frameOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
@@ -210,7 +210,7 @@ for inFile in **; do
         echoCol "Video has been detected to be interlaced." "brown"
     fi
     nice -n $FFMPEGNICE ffmpeg \
-        -loglevel error \
+        -nostdin -loglevel error \
         -stats -hide_banner -y \
         -i "$inFile" \
         -vf "$VFTEMP" \
