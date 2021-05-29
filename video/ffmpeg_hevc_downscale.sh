@@ -192,7 +192,7 @@ for inFile in **; do
             fi
             continue
         fi
-        echoCol "MINBITRATE: Video bitrate ($bitRate kb/s) of input video is higher than the minimum required bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
+        echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
     fi
     VFTEMP="$FFMPEGVF"
     DETECTEDINTERLACE=0
