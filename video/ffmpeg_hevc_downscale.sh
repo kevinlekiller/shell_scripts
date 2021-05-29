@@ -25,8 +25,16 @@ LICENSE
 DELINFIL=${DELINFIL:-1}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
-# Minimun video height to convert video.
+# Minimun allowed bitrate of input video @30fps
+# If the video is 60fps for example, then this value is doubled.
+# Set to 1 to disable.
+MINBITRATE=${MINBITRATE:-3000}
+# If a file is too low res, log it here, it will be skipped on the next run.
+BITRATELOG=${BITRATELOG:-~/.config/ffmpeg_downscale.bitrate}
+# Minimun input video height in pixels to convert video.
 MININHEIGHT=${MININHEIGHT:-800}
+# If a file is too low res, log it here, it will be skipped on the next run.
+LOWLOG=${LOWLOG:-~/.config/ffmpeg_downscale.low}
 # Desired height of the output video in pixels.
 OUTHEIGHT=${OUTHEIGHT:-720}
 # File to store paths to files that have been already converted to
@@ -42,8 +50,6 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=3}
 # vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:-scale=-2:$OUTHEIGHT:flags=lanczos}
-# If a file is too low res, log it here, it will be skipped on the next run.
-LOWLOG=${LOWLOG:-~/.config/ffmpeg_downscale.low}
 # Log converted files to this file:
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
 # Checks if video is interlaced and deinterlaces it.
@@ -71,6 +77,9 @@ function catchExit() {
 
 if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 20 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
     FFMPEGNICE=20
+fi
+if [[ ! $MINBITRATE =~ ^[0-9]*$ ]] || [[ $MINBITRATE -lt 1 ]]; then
+    MINBITRATE=3000
 fi
 if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
     MININHEIGHT=800
@@ -148,7 +157,11 @@ for inFile in **; do
         echoCol "Resolution too low: \"$inFile\". Skipping." "blue"
         continue
     fi
-    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=height,codec_name "$inFile" 2>&1)
+    if [[ -f $BITRATELOG ]] && grep -Fxq "$inFile" "$BITRATELOG"; then
+        echoCol "Bitrate too low: \"$inFile\". Skipping." "blue"
+        continue
+    fi
+    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=height,codec_name,r_frame_rate "$inFile" 2>&1)
     if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
         echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
         if [[ -n $SKIPFILELOG ]]; then
@@ -161,11 +174,25 @@ for inFile in **; do
     fi
     height=$(echo "$details" | grep -Po "height=\d+" | cut -d= -f2)
     if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
-        echoCol "Resolution of video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
+        echoCol "Resolution of input video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
         if [[ -n $LOWLOG ]]; then
             echo "$inFile" >> "$LOWLOG"
         fi
         continue
+    fi
+    if [[ $MINBITRATE -gt 1 ]]; then
+        bitRate=$(echo "$details" | grep -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
+        frameRate=$(echo "$details" | grep -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
+        minBitRate=$(bc -l <<< \(\("$frameRate"\)/30\)*"$MINBITRATE")
+        minBitRate=${minBitRate%.*}
+        if [[ $bitRate =~ ^[0-9]*$ ]] && [[ $frameRate =~ ^[0-9]*\/[0-9]*$ ]] && [[ $bitRate -lt $minBitRate ]]; then
+            echoCol "Bitrate of input video is too low, bitrate is $bitRate, minimum is $minBitRate. Skipping. \"$inFile\"" "blue"
+            if [[ -n $BITRATELOG ]]; then
+                echo "$inFile" >> "$BITRATELOG"
+            fi
+            continue
+        fi
+        echoCol "MINBITRATE: Video bitrate ($bitRate kb/s) of input video is higher than the minimum required bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
     fi
     VFTEMP="$FFMPEGVF"
     DETECTEDINTERLACE=0
