@@ -132,7 +132,7 @@ function catchExit() {
 
 echo 1 > "$fanChassisEnable"
 
-LSPEED=0
+LSPEED=127
 while true; do
     CTEMP=0
     for i in $(seq 0 $tempSensors); do
