@@ -66,6 +66,9 @@ INTERVAL=${INTERVAL:-2.0}
 # Can be disabled with 0, max value is 50.
 SMOOTHDESCENT=${SMOOTHDESCENT:-5}
 
+# Similar to SMOOTHDESCENT, but for when the fan PWM goes up.
+SMOOTHASCENT=${SMOOTHASCENT:-10}
+
 # Set to this fan PWM when temperature is lower than TEMP[0].
 MINSPEED=0
 
@@ -90,6 +93,9 @@ SPEED[3]=255
 
 if [[ ! $SMOOTHDESCENT =~ ^[0-9]*$ ]] || [[ $SMOOTHDESCENT -gt 50 ]] || [[ $SMOOTHDESCENT -lt 1 ]]; then
     SMOOTHDESCENT=0
+fi
+if [[ ! $SMOOTHASCENT =~ ^[0-9]*$ ]] || [[ $SMOOTHASCENT -gt 50 ]] || [[ $SMOOTHASCENT -lt 1 ]]; then
+    SMOOTHASCENT=0
 fi
 
 declare -A PAIRS
@@ -144,15 +150,18 @@ while true; do
     else
         CSPEED=${SPEED[1]}
     fi
-    if [[ $SMOOTHDESCENT -gt 0 ]]; then
-        if [[ $CSPEED -lt $LSPEED ]]; then
-            CSPEED=$(($LSPEED-$SMOOTHDESCENT))
-            if [[ $CSPEED -lt $MINSPEED ]]; then
-                CSPEED=$MINSPEED
-            fi
+    if [[ $CSPEED -lt $LSPEED ]]; then
+        CSPEED=$((LSPEED-SMOOTHDESCENT))
+        if [[ $CSPEED -lt $MINSPEED ]]; then
+            CSPEED=$MINSPEED
         fi
-        LSPEED=$CSPEED
+    elif [[ $CSPEED -gt $LSPEED ]]; then
+        CSPEED=$((LSPEED+SMOOTHASCENT))
+        if [[ $CSPEED -gt ${SPEED[3]} ]]; then
+            CSPEED=${SPEED[3]}
+        fi
     fi
+    LSPEED=$CSPEED
     echo $CSPEED > "$fanChassisControl"
     sleep "$INTERVAL"
 done
