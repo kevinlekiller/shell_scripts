@@ -1,8 +1,7 @@
-# cat /usr/local/sbin/amdgpufancontrol.sh
 #!/bin/bash
 
-<<LICENSE
-	Copyright (C) 2018-2019  kevinlekiller
+cat > /dev/null <<LICENSE
+	Copyright (C) 2018-2021  kevinlekiller
 
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License
@@ -20,8 +19,8 @@
 	https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
-if [[ ! $(lspci | grep VGA.*AMD) ]]; then
-    while [[ 1 ]]; do
+if ! lspci | grep -q "VGA.*AMD"; then
+    while true; do
         sleep 99999
     done
 fi
@@ -30,7 +29,7 @@ fi
 GPUID=${GPUID:-0}
 
 # How many seconds to wait before checking temps / setting fan speeds. Lower values mean higher CPU usage. Leave empty to disable fan control.
-INTERVAL=4
+INTERVAL=${INTERVAL:-4}
 
 # Show the temp to speed map then exit. Leave empty to disable.
 SHOWMAP=${SHOWMAP:-}
@@ -44,25 +43,25 @@ MINSPEED=400
 TEMP[0]=40
 SPEED[0]=500
 
-TEMP[1]=47
-SPEED[1]=1700
+TEMP[1]=45
+SPEED[1]=857
 
-TEMP[2]=53
-SPEED[2]=2900
+TEMP[2]=50
+SPEED[2]=1234
 
-TEMP[3]=60
-SPEED[3]=4100
+TEMP[3]=55
+SPEED[3]=1600
 
 # This is in case there's some kind of logic flaw in the while loop. Can be left as is.
 SAFESPEED=${SPEED[1]}
 
 CARDWD="/sys/class/drm/card$GPUID/device"
-if [[ $(grep 0x1002 $CARDWD/vendor 2> /dev/null) == "" ]]; then
+if [[ $(grep 0x1002 "$CARDWD/vendor" 2> /dev/null) == "" ]]; then
     echo "AMD GPU not found, exiting."
     exit 1
 fi
 
-HWMON="$(find $CARDWD/hwmon/ -name hwmon[0-9] -type d | head -n 1)"
+HWMON="$(find "$CARDWD/hwmon/" -name "hwmon[0-9]" -type d | head -n 1)"
 if [[ ! -d $HWMON ]]; then
     echo "Unable to find hwmon directory for the GPU, fan control and power control requires it, exiting."
     exit 1
@@ -99,7 +98,7 @@ if [[ ! $INTERVAL ]]; then
     exit
 fi
 
-trap cleanup SIGHUP SIGINT SIGQUIT SIGFPE SIGKILL SIGTERM
+trap cleanup SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
 function cleanup() {
     echo "0" > "$HWMON/fan1_enable"
     exit
@@ -107,21 +106,21 @@ function cleanup() {
 
 cp /etc/default/pp_table "$CARDWD/pp_table"
 
-while [[ true ]]; do
-    gpuTemp=$(($(cat $HWMON/temp1_input)/1000))
+while true; do
+    gpuTemp=$(($(cat "$HWMON/temp1_input")/1000))
     if [[ $gpuTemp -lt ${TEMP[0]} ]]; then
-        SPEED=$MINSPEED
+        CSPEED=$MINSPEED
     elif [[ $gpuTemp -ge ${TEMP[3]} ]]; then
-        SPEED=${SPEED[3]}
-    elif [[ ! -z ${PAIRS[$gpuTemp]} ]]; then
-        SPEED=${PAIRS[$gpuTemp]}
+        CSPEED=${SPEED[3]}
+    elif [[ -n ${PAIRS[$gpuTemp]} ]]; then
+        CSPEED=${PAIRS[$gpuTemp]}
     else
-        SPEED=$SAFESPEED
+        CSPEED=$SAFESPEED
     fi
-    if [[ $(cat $HWMON/in0_input) -ge 1000 ]] || [[ $(cat $HWMON/freq2_input) == 800000000 ]]; then
+    if [[ $(cat "$HWMON/in0_input") -ge 1050 ]] || [[ $(cat "$HWMON/freq2_input") == 800000000 ]]; then
         cp /etc/default/pp_table "$CARDWD/pp_table"
     fi
     echo "1" > "$HWMON/fan1_enable"
-    echo "$SPEED" > "$HWMON/fan1_target"
-    sleep $INTERVAL
+    echo "$CSPEED" > "$HWMON/fan1_target"
+    sleep "$INTERVAL"
 done
