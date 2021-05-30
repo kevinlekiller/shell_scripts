@@ -51,10 +51,15 @@ fanChassisControl="$it87BaseDir/pwm5"
 tempSensors=3
 # CPU TDie
 tempSensor[0]="$k10BaseDir/temp2_input"
+# Positive or negative temperature offset you can apply to the sensor.
+# Useful if you want the sensor to have more or less weight on how it affects the fan speed.
+tempOffset[0]=0
 # GPU Edge
 tempSensor[1]="$gpuBaseDir/temp1_input"
+tempOffset[1]=5
 # GPU HBM
 tempSensor[2]="$gpuBaseDir/temp3_input"
+tempOffset[2]=5
 
 # Show the temp to speed map then exit. Leave empty to disable.
 SHOWMAP=${SHOWMAP:-}
@@ -136,7 +141,7 @@ LSPEED=127
 while true; do
     CTEMP=0
     for i in $(seq 0 $tempSensors); do
-        TTEMP=$(($(cat "${tempSensor[$i]}")/1000))
+        TTEMP=$(($(cat "${tempSensor[$i]}")/1000+"${tempOffset[$i]}"))
         if [[ $TTEMP -gt $CTEMP ]]; then
             CTEMP=$TTEMP
         fi
