@@ -1,0 +1,12 @@
+[Unit]
+Description=Controls the fanspeed of the chassis fans.
+After=local-fs.target
+
+[Service]
+ExecStart=/usr/local/sbin/chassisfancontrol.sh
+Type=simple
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
