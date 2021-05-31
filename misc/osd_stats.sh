@@ -28,7 +28,7 @@ for device in amdgpu it8665 k10temp; do
     eval "${device}_dir"="$tmpPath"
 done
 
-osd_delay=3
+osd_delay=2
 osd_position=top
 osd_align=right
 osd_top_offset=5
@@ -79,15 +79,20 @@ function printOSD() {
     --lines="$osd_lines" \
     --font="$osd_font" \
     --outline="$osd_outline" \
-    --delay="$1"
+    --delay="$1" &
 }
-
+trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
+function catchExit() {
+    pkill osd_cat
+    exit 0
+}
 for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
 done
 osd_lines="$((vals+2))"
 printOSD "-1" &
 osd_side_offset="$((osd_side_offset+40))"
+sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 while true; do
     string=""
     for i in $(seq 0 $vals); do
@@ -98,4 +103,5 @@ while true; do
         fi
     done
     printOSD "$osd_delay"
+    sleep "$sleep_delay"
 done
