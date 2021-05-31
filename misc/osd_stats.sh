@@ -67,6 +67,9 @@ valLoc_[6]="$amdgpu_dir/temp2_input"
 
 vals=6
 
+###########################################################
+###########################################################
+
 trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
 function catchExit() {
     if ps -p "$childPid" > /dev/null; then
@@ -75,15 +78,24 @@ function catchExit() {
     exit 0
 }
 
-###########################################################
-###########################################################
+function printOSD() {
+    echo -e "$string" | osd_cat \
+    --pos="$osd_position" \
+    --offset="$osd_top_offset" \
+    --align="$osd_align" \
+    --indent="$osd_side_offset" \
+    --color="$osd_color" \
+    --lines="$osd_lines" \
+    --font="$osd_font" \
+    --outline="$osd_outline" \
+    --delay="$1"
+}
 
 osd_lines="$((vals+2))"
-string=""
 for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
 done
-echo -e "$string" | osd_cat --pos="$osd_position" --offset="$osd_top_offset" --align="$osd_align" --indent="$osd_side_offset" --color="$osd_color" --lines="$osd_lines" --font="$osd_font" --outline="$osd_outline" --delay=-1 &
+printOSD "-1" &
 childPid=$!
 osd_side_offset="$((osd_side_offset+40))"
 while true; do
@@ -95,5 +107,5 @@ while true; do
             string="$string$(cat "${valLoc_[$i]}")\n"
         fi
     done
-    echo -e "$string" | osd_cat --pos="$osd_position" --offset="$osd_top_offset" --align="$osd_align" --indent="$osd_side_offset" --color="$osd_color" --lines="$osd_lines" --font="$osd_font" --outline="$osd_outline" --delay="$osd_delay"
+    printOSD "$osd_delay"
 done
