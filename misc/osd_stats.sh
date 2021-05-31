@@ -69,15 +69,6 @@ vals=6
 
 ###########################################################
 ###########################################################
-
-trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
-function catchExit() {
-    if ps -p "$childPid" > /dev/null; then
-        kill "$childPid" &> /dev/null
-    fi
-    exit 0
-}
-
 function printOSD() {
     echo -e "$string" | osd_cat \
     --pos="$osd_position" \
@@ -91,12 +82,11 @@ function printOSD() {
     --delay="$1"
 }
 
-osd_lines="$((vals+2))"
 for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
 done
+osd_lines="$((vals+2))"
 printOSD "-1" &
-childPid=$!
 osd_side_offset="$((osd_side_offset+40))"
 while true; do
     string=""
