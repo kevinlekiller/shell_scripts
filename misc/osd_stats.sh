@@ -90,7 +90,7 @@ for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
 done
 osd_lines="$((vals+2))"
-printOSD "-1" &
+printOSD "-1"
 osd_side_offset="$((osd_side_offset+40))"
 sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 while true; do
