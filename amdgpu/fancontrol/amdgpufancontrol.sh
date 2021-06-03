@@ -25,6 +25,9 @@ if ! lspci | grep -q "VGA.*AMD"; then
     done
 fi
 
+# Power play table file to apply.
+PPTABLE=${PPTABLE:-/etc/default/pp_table}
+
 # Which GPU to use.
 GPUID=${GPUID:-0}
 
@@ -94,6 +97,12 @@ if [[ $SHOWMAP ]]; then
     exit
 fi
 
+# This is done due to a long standing bug which causes the HBM frequency to drop to 167MHz if the pp_table
+# or pp_ settings are modified more than once after boot: https://bugs.freedesktop.org/show_bug.cgi?id=110777
+if [[ -f $PPTABLE ]] && [[ $(sha256sum "$PPTABLE" | cut -d\  -f1) != $(sha256sum "$CARDWD/pp_table" | cut -d\  -f1) ]]; then
+    cp "$PPTABLE" "$CARDWD/pp_table"
+fi
+
 if [[ ! $INTERVAL ]]; then
     exit
 fi
@@ -103,8 +112,6 @@ function cleanup() {
     echo "0" > "$HWMON/fan1_enable"
     exit
 }
-
-cp /etc/default/pp_table "$CARDWD/pp_table"
 
 while true; do
     gpuTemp=$(($(cat "$HWMON/temp1_input")/1000))
@@ -116,9 +123,6 @@ while true; do
         CSPEED=${PAIRS[$gpuTemp]}
     else
         CSPEED=$SAFESPEED
-    fi
-    if [[ $(cat "$HWMON/in0_input") -ge 1050 ]] || [[ $(cat "$HWMON/freq2_input") == 800000000 ]]; then
-        cp /etc/default/pp_table "$CARDWD/pp_table"
     fi
     echo "1" > "$HWMON/fan1_enable"
     echo "$CSPEED" > "$HWMON/fan1_target"
