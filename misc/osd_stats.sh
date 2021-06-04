@@ -175,7 +175,7 @@ while true; do
         if [[ ${valType[$j]} == C ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1000))\n"
         elif [[ ${valName[$j]} == CPU && ${valType[$j]} == MHz ]]; then
-            string="$string$(grep MHz "${valLoc_[$j]}"  | cut -d: -f2 | cut -d. -f1 | sort -nr | head -n1 | sed "s/ *//g")\n"
+            string="$string$(grep -Po "(?<=cpu MHz\t\t:\s)\d+" "${valLoc_[$j]}" | sort -nr | head -n1)\n"
         elif [[ ${valType[$j]} == W || ${valType[$j]} == MHz ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1000000))\n"
         elif [[ ${valType[$j]} == MB ]]; then
