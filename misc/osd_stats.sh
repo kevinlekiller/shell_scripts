@@ -19,7 +19,14 @@ cat > /dev/null <<LICENSE
     https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
-for device in amdgpu it8665 k10temp; do
+# To pause / resume the OSD, add a custom shortcut.
+# Add this as the action : bash -c "if pgrep osd_stats.sh$; then pkill osd_stats.sh$; else osd_stats.sh; fi"
+# For example, in KDE Plasma, go in system settings, click Shortcuts -> Custom Shortcuts.
+# Right click ; New -> Global Shortcut -> Command/URL
+# In the Trigger, add the keyboard shortcut.
+# In the Action, paste the command above.
+
+for device in amdgpu it8665; do
     tmpPath=$(grep "$device" /sys/class/hwmon/hwmon*/name | grep -Po "^/sys/class/hwmon/hwmon\d+")
     if [[ -z $tmpPath ]]; then
         echo "Could not find hwmon path for device '$device'."
@@ -39,7 +46,7 @@ osd_font="-*-*-*-*-*-*-20-*-*-*-*-*-*-*"
 
 valName[0]=CPU
 valType[0]=C
-valLoc_[0]="$k10temp_dir/temp2_input"
+valLoc_[0]="$it8665_dir/temp1_input"
 
 valName[1]=CPU
 valType[1]=RPM
@@ -54,18 +61,26 @@ valType[3]=RPM
 valLoc_[3]="$amdgpu_dir/fan1_input"
 
 valName[4]=GPU
-valType[4]=C
-valLoc_[4]="$amdgpu_dir/temp1_input"
+valType[4]=mV
+valLoc_[4]="$amdgpu_dir/in0_input"
 
-valName[5]="GPU HBM"
-valType[5]=C
-valLoc_[5]="$amdgpu_dir/temp3_input"
+valName[5]=GPU
+valType[5]=W
+valLoc_[5]="$amdgpu_dir/power1_average"
 
-valName[6]="GPU jnc"
+valName[6]=GPU
 valType[6]=C
-valLoc_[6]="$amdgpu_dir/temp2_input"
+valLoc_[6]="$amdgpu_dir/temp1_input"
 
-vals=6
+valName[7]="GPU HBM"
+valType[7]=C
+valLoc_[7]="$amdgpu_dir/temp3_input"
+
+valName[8]="GPU jnc"
+valType[8]=C
+valLoc_[8]="$amdgpu_dir/temp2_input"
+
+vals=9
 
 ###########################################################
 ###########################################################
@@ -86,18 +101,21 @@ function catchExit() {
     pkill osd_cat
     exit 0
 }
+((--vals))
+osd_lines="$((vals+2))"
+sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
 done
-osd_lines="$((vals+2))"
 printOSD "-1"
 osd_side_offset="$((osd_side_offset+40))"
-sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 while true; do
     string=""
     for i in $(seq 0 $vals); do
         if [[ ${valType[$i]} == C ]]; then
             string="$string$(($(cat "${valLoc_[$i]}")/1000))\n"
+        elif [[ ${valType[$i]} == W ]]; then
+            string="$string$(($(cat "${valLoc_[$i]}")/1000000))\n"
         else
             string="$string$(cat "${valLoc_[$i]}")\n"
         fi
