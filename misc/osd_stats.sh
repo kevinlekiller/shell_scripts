@@ -45,42 +45,62 @@ osd_color=green
 osd_font="-*-*-*-*-*-*-20-*-*-*-*-*-*-*"
 
 valName[0]=CPU
-valType[0]=C
-valLoc_[0]="$it8665_dir/temp1_input"
+valType[0]=MHz
+valLoc_[0]="/proc/cpuinfo"
 
 valName[1]=CPU
-valType[1]=RPM
-valLoc_[1]="$it8665_dir/fan1_input"
+valType[1]=C
+valLoc_[1]="$it8665_dir/temp1_input"
 
-valName[2]=Chassis
+valName[2]=CPU
 valType[2]=RPM
-valLoc_[2]="$it8665_dir/fan5_input"
+valLoc_[2]="$it8665_dir/fan1_input"
 
-valName[3]=GPU
+valName[3]=Chassis
 valType[3]=RPM
-valLoc_[3]="$amdgpu_dir/fan1_input"
+valLoc_[3]="$it8665_dir/fan5_input"
 
 valName[4]=GPU
-valType[4]=mV
-valLoc_[4]="$amdgpu_dir/in0_input"
+valType[4]=RPM
+valLoc_[4]="$amdgpu_dir/fan1_input"
 
 valName[5]=GPU
-valType[5]=W
-valLoc_[5]="$amdgpu_dir/power1_average"
+valType[5]=mV
+valLoc_[5]="$amdgpu_dir/in0_input"
 
-valName[6]=GPU
-valType[6]=C
-valLoc_[6]="$amdgpu_dir/temp1_input"
+valName[6]="GPU Load"
+valType[6]=%
+valLoc_[6]="$amdgpu_dir/device/gpu_busy_percent"
 
-valName[7]="GPU HBM"
-valType[7]=C
-valLoc_[7]="$amdgpu_dir/temp3_input"
+valName[7]=GPU
+valType[7]=W
+valLoc_[7]="$amdgpu_dir/power1_average"
 
-valName[8]="GPU jnc"
-valType[8]=C
-valLoc_[8]="$amdgpu_dir/temp2_input"
+valName[8]=GPU
+valType[8]=MHz
+valLoc_[8]="$amdgpu_dir/device/pp_dpm_sclk"
 
-vals=9
+valName[9]="GPU HBM"
+valType[9]=MHz
+valLoc_[9]="$amdgpu_dir/device/pp_dpm_mclk"
+
+valName[10]=GPU
+valType[10]=C
+valLoc_[10]="$amdgpu_dir/temp1_input"
+
+valName[11]="GPU HBM"
+valType[11]=C
+valLoc_[11]="$amdgpu_dir/temp3_input"
+
+valName[12]="GPU jnc"
+valType[12]=C
+valLoc_[12]="$amdgpu_dir/temp2_input"
+
+valName[13]=VRAM
+valType[13]=MB
+valLoc_[13]="$amdgpu_dir/device/mem_info_vram_used"
+
+vals=14
 
 ###########################################################
 ###########################################################
@@ -106,6 +126,10 @@ osd_lines="$((vals+2))"
 sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 for i in $(seq 0 $vals); do
     string="$string$(printf "%-8s%6s%-3s" "${valName[$i]}" "" "${valType[$i]}")\n"
+    if [[ ! -f ${valLoc_[$i]} ]]; then
+        echo "Error: Sensor path not found: '${valLoc_[$i]}'"
+        exit 1
+    fi
 done
 printOSD "-1"
 osd_side_offset="$((osd_side_offset+40))"
@@ -116,6 +140,12 @@ while true; do
             string="$string$(($(cat "${valLoc_[$i]}")/1000))\n"
         elif [[ ${valType[$i]} == W ]]; then
             string="$string$(($(cat "${valLoc_[$i]}")/1000000))\n"
+        elif [[ ${valType[$i]} == MB ]]; then
+            string="$string$(($(cat "${valLoc_[$i]}")/1048576))\n"
+        elif [[ ${valName[$i]} == CPU && ${valType[$i]} == MHz ]]; then
+            string="$string$(grep MHz "${valLoc_[$i]}"  | cut -d: -f2 | cut -d. -f1 | sort -nr | head -n1 | sed "s/ *//g")\n"
+        elif [[ ${valType[$i]} == MHz ]]; then
+            string="$string$(grep "\*" "${valLoc_[$i]}" | grep -Po "[0-9]{3,4}")\n"
         else
             string="$string$(cat "${valLoc_[$i]}")\n"
         fi
