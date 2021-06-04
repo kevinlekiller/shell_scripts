@@ -19,7 +19,7 @@ cat > /dev/null <<LICENSE
     https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
-# Example image of script running: https://raw.githubusercontent.com/kevinlekiller/shell_scripts/main/misc/osd_stats.png
+# Example image of script running: https://raw.githubusercontent.com/kevinlekiller/shell_scripts/main/misc/osd_stats.jpg
 
 # To pause / resume the OSD, add a custom shortcut.
 # Add this as the action : bash -c "if pgrep osd_stats.sh$; then pkill osd_stats.sh$; else osd_stats.sh; fi"
@@ -59,7 +59,12 @@ valLoc_[$i]="$zenpower_dir/power1_input"
 
 valName[$i]=CPU
 valType[$i]=mV
-valLoc_[$i]="$zenpower_dir/in1_input"
+valLoc_[$i]="$it8665_dir/in0_input"
+((++i))
+
+valName[$i]=DRAM
+valType[$i]=mV
+valLoc_[$i]="$it8665_dir/in1_input"
 ((++i))
 
 valName[$i]="CPU SOC"
@@ -104,12 +109,12 @@ valLoc_[$i]="$amdgpu_dir/power1_average"
 
 valName[$i]=GPU
 valType[$i]=MHz
-valLoc_[$i]="$amdgpu_dir/device/pp_dpm_sclk"
+valLoc_[$i]="$amdgpu_dir/freq1_input"
 ((++i))
 
 valName[$i]="GPU HBM"
 valType[$i]=MHz
-valLoc_[$i]="$amdgpu_dir/device/pp_dpm_mclk"
+valLoc_[$i]="$amdgpu_dir/freq2_input"
 ((++i))
 
 valName[$i]=GPU
@@ -169,14 +174,12 @@ while true; do
     for j in $(seq 0 "$i"); do
         if [[ ${valType[$j]} == C ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1000))\n"
-        elif [[ ${valType[$j]} == W ]]; then
+        elif [[ ${valName[$j]} == CPU && ${valType[$j]} == MHz ]]; then
+            string="$string$(grep MHz "${valLoc_[$j]}"  | cut -d: -f2 | cut -d. -f1 | sort -nr | head -n1 | sed "s/ *//g")\n"
+        elif [[ ${valType[$j]} == W || ${valType[$j]} == MHz ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1000000))\n"
         elif [[ ${valType[$j]} == MB ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1048576))\n"
-        elif [[ ${valName[$j]} == CPU && ${valType[$j]} == MHz ]]; then
-            string="$string$(grep MHz "${valLoc_[$j]}"  | cut -d: -f2 | cut -d. -f1 | sort -nr | head -n1 | sed "s/ *//g")\n"
-        elif [[ ${valType[$j]} == MHz ]]; then
-            string="$string$(grep "\*" "${valLoc_[$j]}" | grep -Po "[0-9]{3,4}")\n"
         else
             string="$string$(cat "${valLoc_[$j]}")\n"
         fi
