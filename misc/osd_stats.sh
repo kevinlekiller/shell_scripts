@@ -19,6 +19,8 @@ cat > /dev/null <<LICENSE
     https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
+# Example image of script running: https://raw.githubusercontent.com/kevinlekiller/shell_scripts/main/misc/osd_stats.png
+
 # To pause / resume the OSD, add a custom shortcut.
 # Add this as the action : bash -c "if pgrep osd_stats.sh$; then pkill osd_stats.sh$; else osd_stats.sh; fi"
 # For example, in KDE Plasma, go in system settings, click Shortcuts -> Custom Shortcuts.
