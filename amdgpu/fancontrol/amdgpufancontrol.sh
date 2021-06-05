@@ -1,22 +1,22 @@
 #!/bin/bash
 
 cat > /dev/null <<LICENSE
-	Copyright (C) 2018-2021  kevinlekiller
+    Copyright (C) 2018-2021  kevinlekiller
 
-	This program is free software; you can redistribute it and/or
-	modify it under the terms of the GNU General Public License
-	as published by the Free Software Foundation; either version 2
-	of the License, or (at your option) any later version.
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-	https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+    https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
 if ! lspci | grep -q "VGA.*AMD"; then
@@ -25,14 +25,18 @@ if ! lspci | grep -q "VGA.*AMD"; then
     done
 fi
 
-# Power play table file to apply.
-PPTABLE=${PPTABLE:-/etc/default/pp_table}
+# Set to 1 to apply custom overclock settings.
+# Change overclock settings below.
+OVERCLOCK=${OVERCLOCK:-1}
+
+# Set to 1 to set GPU power limit to max.
+POWERLIMIT=${POWERLIMIT:-1}
 
 # Which GPU to use.
 GPUID=${GPUID:-0}
 
 # How many seconds to wait before checking temps / setting fan speeds. Lower values mean higher CPU usage. Leave empty to disable fan control.
-INTERVAL=${INTERVAL:-4}
+INTERVAL=${INTERVAL:-2.5}
 
 # Show the temp to speed map then exit. Leave empty to disable.
 SHOWMAP=${SHOWMAP:-}
@@ -97,22 +101,60 @@ if [[ $SHOWMAP ]]; then
     exit
 fi
 
-# This is done due to a long standing bug which causes the HBM frequency to drop to 167MHz if the pp_table
-# or pp_ settings are modified more than once after boot: https://bugs.freedesktop.org/show_bug.cgi?id=110777
-if [[ -f $PPTABLE ]] && [[ $(sha256sum "$PPTABLE" | cut -d\  -f1) != $(sha256sum "$CARDWD/pp_table" | cut -d\  -f1) ]]; then
-    cp "$PPTABLE" "$CARDWD/pp_table"
+trap cleanup SIGHUP SIGINT SIGQUIT SIGTERM
+function cleanup() {
+    if [[ $INTERVAL ]]; then
+        echo "0" > "$HWMON/fan1_enable"
+    fi
+    if [[ $OVERCLOCK ]]; then
+        echo "r" > "$CARDWD/pp_od_clk_voltage"
+    fi
+    if [[ $POWERLIMIT && $POWERLIMIT -gt 1 ]]; then
+        echo "$POWERLIMIT"  > "$HWMON/power1_cap"
+    fi
+    exit 0
+}
+
+if [[ $OVERCLOCK ]]; then
+    # s is for the GPU clock speed
+    # m is the memory clock speed
+    # The first number the P-State
+    # The second number is the clock speed
+    # The third number is the voltage in mV
+    # The memory p-states 0 and 1 must have the same voltage as the GPU p-state 0
+    # The memory p-state 2 must have the same voltage as the GPU p-state 2
+    # The memory p-state 3 must have the same voltage as the GPU p-state 5
+    # Get default values with : cat /sys/class/drm/card0/device/pp_od_clk_voltage
+
+    for string in\
+        "s 0 852 800"\
+        "s 1 991 850"\
+        "s 2 1084 900"\
+        "s 3 1138 925"\
+        "s 4 1200 950"\
+        "s 5 1431 975"\
+        "s 6 1630 1000"\
+        "s 7 1722 1025"\
+        "m 0 167 800"\
+        "m 1 500 800"\
+        "m 2 800 900"\
+        "m 3 1085 975";
+    do
+        echo "$string" > "$CARDWD/pp_od_clk_voltage"
+    done
+    echo "c" > "$CARDWD/pp_od_clk_voltage"
+fi
+
+if [[ $POWERLIMIT ]]; then
+    POWERLIMIT=$(cat "$HWMON/power1_cap")
+    echo "$(cat "$HWMON/power1_cap_max")" > "$HWMON/power1_cap"
 fi
 
 if [[ ! $INTERVAL ]]; then
     exit
 fi
 
-trap cleanup SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
-function cleanup() {
-    echo "0" > "$HWMON/fan1_enable"
-    exit
-}
-
+echo "1" > "$HWMON/fan1_enable"
 while true; do
     gpuTemp=$(($(cat "$HWMON/temp1_input")/1000))
     if [[ $gpuTemp -lt ${TEMP[0]} ]]; then
@@ -124,7 +166,6 @@ while true; do
     else
         CSPEED=$SAFESPEED
     fi
-    echo "1" > "$HWMON/fan1_enable"
     echo "$CSPEED" > "$HWMON/fan1_target"
     sleep "$INTERVAL"
 done
