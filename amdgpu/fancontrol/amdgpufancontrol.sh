@@ -25,9 +25,8 @@ if ! lspci | grep -q "VGA.*AMD"; then
     done
 fi
 
-# Set to 1 to apply custom overclock settings.
-# Change overclock settings below.
-OVERCLOCK=${OVERCLOCK:-1}
+# Power play table to apply
+PPTABLE=${OVERCLOCK:-/etc/default/pp_table}
 
 # Set to 1 to set GPU power limit to max.
 POWERLIMIT=${POWERLIMIT:-1}
@@ -106,43 +105,14 @@ function cleanup() {
     if [[ $INTERVAL ]]; then
         echo "0" > "$HWMON/fan1_enable"
     fi
-    if [[ $OVERCLOCK ]]; then
-        echo "r" > "$CARDWD/pp_od_clk_voltage"
-    fi
     if [[ $POWERLIMIT && $POWERLIMIT -gt 1 ]]; then
         echo "$POWERLIMIT"  > "$HWMON/power1_cap"
     fi
     exit 0
 }
 
-if [[ $OVERCLOCK ]]; then
-    # s is for the GPU clock speed
-    # m is the memory clock speed
-    # The first number the P-State
-    # The second number is the clock speed
-    # The third number is the voltage in mV
-    # The memory p-states 0 and 1 must have the same voltage as the GPU p-state 0
-    # The memory p-state 2 must have the same voltage as the GPU p-state 2
-    # The memory p-state 3 must have the same voltage as the GPU p-state 5
-    # Get default values with : cat /sys/class/drm/card0/device/pp_od_clk_voltage
-
-    for string in\
-        "s 0 852 800"\
-        "s 1 991 850"\
-        "s 2 1084 900"\
-        "s 3 1138 925"\
-        "s 4 1200 950"\
-        "s 5 1431 975"\
-        "s 6 1630 1000"\
-        "s 7 1722 1025"\
-        "m 0 167 800"\
-        "m 1 500 800"\
-        "m 2 800 900"\
-        "m 3 1085 975";
-    do
-        echo "$string" > "$CARDWD/pp_od_clk_voltage"
-    done
-    echo "c" > "$CARDWD/pp_od_clk_voltage"
+if [[ -f $PPTABLE ]]; then
+    cp "$PPTABLE" "$CARDWD/pp_table"
 fi
 
 if [[ $POWERLIMIT ]]; then
