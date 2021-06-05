@@ -38,7 +38,7 @@ for device in amdgpu it8665 zenpower; do
     eval "${device}_dir"="$tmpPath"
 done
 
-osd_delay=3
+osd_delay=2
 osd_position=top
 osd_align=right
 osd_top_offset=5
@@ -46,6 +46,11 @@ osd_side_offset=5
 osd_outline=2
 osd_color=green
 osd_font="-*-*-*-*-*-*-20-*-*-*-*-*-*-*"
+
+valName[$i]=Time
+valType[$i]=""
+valLoc_[$i]="date +%H:%M"
+((++i))
 
 valName[$i]=CPU
 valType[$i]=MHz
@@ -161,11 +166,11 @@ function catchExit() {
 osd_lines="$((i+2))"
 sleep_delay=$(bc -l <<< "$osd_delay-0.1")
 for j in $(seq 0 "$i"); do
-    string="$string$(printf "%-8s%6s%-3s" "${valName[$j]}" "" "${valType[$j]}")\n"
     if [[ ! -f ${valLoc_[$i]} ]]; then
         echo "Error: Sensor path not found: '${valLoc_[$j]}'"
         exit 1
     fi
+    string="$string$(printf "%-8s%6s%-3s" "${valName[$j]}" "" "${valType[$j]}")\n"
 done
 printOSD "-1"
 osd_side_offset="$((osd_side_offset+40))"
@@ -180,6 +185,8 @@ while true; do
             string="$string$(($(cat "${valLoc_[$j]}")/1000000))\n"
         elif [[ ${valType[$j]} == MB ]]; then
             string="$string$(($(cat "${valLoc_[$j]}")/1048576))\n"
+        elif [[ ${valName[$j]} == Time ]]; then
+            string="$string$(eval "${valLoc_[$j]}")\n"
         else
             string="$string$(cat "${valLoc_[$j]}")\n"
         fi
