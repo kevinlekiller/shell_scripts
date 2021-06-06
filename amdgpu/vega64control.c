@@ -340,6 +340,8 @@ void printUsage() {
     printf("   Maximum VRAM P-State. (valid: 1 to 3) (default: 3)\n");
     printf(" -i [float]\n");
     printf("   Loop pause time. (valid: 0.05 to 60) (default: 1.0)\n");
+    printf(" -n [integer]\n");
+    printf("   Set the process priority (niceness) (valid: -20 to 19)\n");
     printf(" -p [FILE]\n");
     printf("   Modified powerplay table to apply.\n");
     printf(" -u\n");
@@ -372,7 +374,7 @@ int main(int argc, char **argv) {
     signal(SIGINT, cleanup);
     signal(SIGTERM, cleanup);
     signal(SIGHUP, cleanup);
-    while ((c = getopt(argc, argv, "chsua:b:d:i:p:v:w:x:y:z:")) != -1) {
+    while ((c = getopt(argc, argv, "chsua:b:d:i:n:p:v:w:x:y:z:")) != -1) {
         switch (c) {
             case 'a':
                 smoothUp = atoi(optarg);
@@ -428,6 +430,14 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Interval must be between 0.05 and 60.0\n");
                     return 1;
                 }
+                break;
+            case 'n':
+                int niceness = atoi(optarg);
+                if (niceness < -20 || niceness > 19) {
+                    fprintf(stderr, "ERROR: Niceness must be -20 to 19\n");
+                    return 1;
+                }
+                nice(niceness);
                 break;
             case 'p':
                 user_pp_table = optarg;
