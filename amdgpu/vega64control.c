@@ -32,7 +32,7 @@
 int gpuID = 0, minFanSpeed = 0, lowFanSpeed = 0, highFanSpeed = 0, lowTemp = 0 , highTemp = 0;
 int gpuPstate = 0, socPstate, vramPstate = 0, maxGpuState = 7, maxSocState = 7, maxVramState = 3;
 int silent = 0, iters = 0, smoothUp = 0, smoothDown = 0, lastFanSpeed = 0;
-bool fanSpeedControl;
+bool fanSpeedControl, pstateControl = false;
 float interval = 1.0;
 const char * user_pp_table;
 char devPath[50];
@@ -69,19 +69,18 @@ bool readFile(const char * path, size_t size) {
 }
 
 void cleanup() {
-    if (!silent) {
-        printf("\n");
-    }
     if (fanSpeedControl) {
         if (!silent) {
-            printf("Enabling automatic fan control\n");
+            printf("\nEnabling automatic fan control\n");
         }
         writeFile(fan1_enable, "0");
     }
-    if (!silent) {
-        printf("Enabling automatic P-State control.\n");
+    if (pstateControl) {
+        if (!silent) {
+            printf("Enabling automatic P-State control.\n");
+        }
+        writeFile(power_dpm_force_performance_level, "auto");
     }
-    writeFile(power_dpm_force_performance_level, "auto");
     exit(0);
 }
 
@@ -290,6 +289,7 @@ bool getHwmonPath() {
     while ((files = readdir(dir)) != NULL) {
         if (strstr(files->d_name, "hwmon")) {
             foundHwmon = files->d_name;
+            break;
         }
     }
     closedir(dir);
@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
     return 1;
 #endif
     int c;
-    bool printLut = false, pstateControl = false;
+    bool printLut = false;
     signal(SIGQUIT, cleanup);
     signal(SIGINT, cleanup);
     signal(SIGTERM, cleanup);
