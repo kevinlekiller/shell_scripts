@@ -24,7 +24,7 @@
 * properly, if you set the voltages to maximum 950mV for example, the voltage
 * will still get up to 1200mV.
 * Modyfying the pp_table also doesn't work properly, the voltage often stays
-* stuck at, the HBM clock speed doesn't go back down, the SOC P-State usually
+* stuck, the HBM clock speed doesn't go back down, the SOC P-State usually
 * is stuck at 5.
 * 
 * This program will increase/decrease the GPU/SOC/VRAM P-States based on GPU load.
