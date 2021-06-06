@@ -1,0 +1,12 @@
+[Unit]
+Description=Controls the fanspeed and P-States of the AMD VEGA GPU.
+After=graphical.target
+
+[Service]
+ExecStart=/usr/local/bin/vega64control -p/etc/default/pp_table -v400 -w500 -x40 -y1600 -z55 -b10 -c -s
+Type=simple
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
