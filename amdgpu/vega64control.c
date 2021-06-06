@@ -17,6 +17,21 @@
 
 // gcc vega64control.c -o vega64control -Wextra -O2 -lm
 
+/**
+* This program can be used to control the P-States / fanspeed and set a custom
+* power play table on a AMD vega 64 (and probably 56) GPU.
+* This program was created because using pp_od_clk_voltage doesn't work
+* properly, if you set the voltages to maximum 950mV for example, the voltage
+* will still get up to 1200mV.
+* Modyfying the pp_table also doesn't work properly, the voltage often stays
+* stuck at, the HBM clock speed doesn't go back down, the SOC P-State usually
+* is stuck at 5.
+* 
+* This program will increase/decrease the GPU/SOC/VRAM P-States based on GPU load.
+* It will keep increasing the P-States if the GPU load is 50% or more.
+* It will only lower the P-States if the GPU load has been lower than 50% for a period of time.
+*/
+
 #include <dirent.h>
 #include <math.h>
 #include <signal.h>
@@ -116,6 +131,7 @@ void setPstates() {
         return;
     }
     if (atoi(buf) >= 50) {
+        iters = 0;
         if (socPstate <= maxSocState) {
             socPstate++;
             sprintf(buf, "%d", socPstate);
