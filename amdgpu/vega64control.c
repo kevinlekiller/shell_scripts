@@ -293,6 +293,11 @@ bool getDevPath() {
     return dirExists(devPath, true);
 }
 
+void setPPTable() {
+    sprintf(buf, "cp \"%s\" \"%s\"", user_pp_table, pp_table);
+    system(buf);
+}
+
 bool getHwmonPath() {
     sprintf(hwmonPath, "%s/hwmon", devPath);
     DIR *dir = opendir(hwmonPath);
@@ -523,15 +528,24 @@ int main(int argc, char **argv) {
         if (!silent) {
             printf("Copying power play table: '%s' -> '%s'\n", user_pp_table, pp_table);
         }
-        sprintf(buf, "cp \"%s\" \"%s\"", user_pp_table, pp_table);
-        system(buf);
+        setPPTable();
     }
+    int i = 0;
     while (1) {
         if (fanSpeedControl) {
             setFanSpeed();
         }
         if (pstateControl) {
             setPstates();
+            // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
+            if (user_pp_table && vramPstate == 0) {
+                if (i++ > 20 && readFile(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+                    setPPTable();
+                    i = 0;
+                }
+            } else {
+                i = 0;
+            }
         }
         sleep(interval);
     }
