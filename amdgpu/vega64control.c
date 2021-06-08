@@ -33,6 +33,7 @@
 */
 
 #include <dirent.h>
+#include <getopt.h>
 #include <math.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -42,11 +43,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#define ITERRESET 10
-
 int gpuID = 0, minFanSpeed = 0, lowFanSpeed = 0, highFanSpeed = 0, lowTemp = 0 , highTemp = 0;
 int gpuPstate = 0, socPstate, vramPstate = 0, maxGpuState = 7, maxSocState = 7, maxVramState = 3;
-int silent = 0, iters = 0, smoothUp = 0, smoothDown = 0, lastFanSpeed = 0;
+int silent = 0, iters = 0, smoothUp = 0, smoothDown = 0, lastFanSpeed = 0, gpuLoadCheck = 50, iterLimit = 10;
 bool fanSpeedControl, pstateControl = false;
 float interval = 1.0;
 const char * user_pp_table;
@@ -96,7 +95,7 @@ void cleanup() {
         }
         writeFile(power_dpm_force_performance_level, "auto");
     }
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 void setVramPstate() {
@@ -130,7 +129,7 @@ void setPstates() {
     if (!readFile(gpu_busy_percent, 3)) {
         return;
     }
-    if (atoi(buf) >= 50) {
+    if (atoi(buf) >= gpuLoadCheck) {
         iters = 0;
         if (socPstate <= maxSocState) {
             socPstate++;
@@ -146,7 +145,7 @@ void setPstates() {
         if (!silent) {
             printf ("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
-    } else if ((gpuPstate > 0 || socPstate > 0) && iters++ >= ITERRESET) {
+    } else if ((gpuPstate > 0 || socPstate > 0) && iters++ >= iterLimit) {
         iters = 0;
         if (socPstate > 0) {
             socPstate--;
@@ -325,47 +324,51 @@ bool getHwmonPath() {
 void printUsage() {
     printf("Program for controling Fan / P-States on AMD Vega 64.\n");
     printf("Options:\n");
-    printf(" -h\n");
+    printf(" -h, --help\n");
     printf("   Displays this information.\n");
-    printf(" -s\n");
+    printf(" -s, --silent\n");
     printf("   Output nothing to stdout.\n");
-    printf(" -a [integer]\n");
-    printf("   When increasing fan RPM, go up by this much per -i [float] seconds.\n");
-    printf(" -b [integer]\n");
-    printf("   When decreasing fan RPM, go down by this much per -i [float] seconds.\n");
-    printf(" -c\n");
-    printf("   Enable P-State control.\n");
-    printf(" -d [integer]\n");
+    printf(" -d, --gpu-id=NUM\n");
     printf("   GPU id\n");
-    printf(" -e [integer]\n");
+    printf(" -c, --pstate-control\n");
+    printf("   Enable P-State control.\n");
+    printf(" -e, --pstate-gpu-max=NUM\n");
     printf("   Maximum GPU P-State. (valid: 1 to 7) (default: 7)\n");
-    printf(" -f [integer]\n");
+    printf(" -f, --pstate-soc-max=NUM\n");
     printf("   Maximum SOC P-State. (valid: 1 to 7) (default: 7)\n");
-    printf(" -g [integer]\n");
+    printf(" -g, --pstate-vram-max=NUM\n");
     printf("   Maximum VRAM P-State. (valid: 1 to 3) (default: 3)\n");
-    printf(" -i [float]\n");
-    printf("   Loop pause time. (valid: 0.05 to 60) (default: 1.0)\n");
-    printf(" -n [integer]\n");
-    printf("   Set the process priority (niceness) (valid: -20 to 19)\n");
-    printf(" -p [FILE]\n");
+    printf(" -l, --pstate-load=NUM\n");
+    printf("   Percentage ; If the load of the GPU is equal or higher than this, raise the P-States. (valid 1 to 100) (default: 50)\n");
+    printf(" -r, --pstate-decrease-loops=NUM\n");
+    printf("   How many loops in a row the GPU load must be under --pstate-load before lowering the P-States. (valid 1+) (default 10)\n");
+    printf(" -p, --pptable=FILE\n");
     printf("   Modified powerplay table to apply.\n");
-    printf(" -u\n");
+    printf(" -i, --interval=FLOAT\n");
+    printf("   Loop pause time. (valid: 0.05 to 60) (default: 1.0)\n");
+    printf(" -n, --niceness=NUM\n");
+    printf("   Set the process priority (niceness) (valid: -20 to 19)\n");
+    printf(" -u, --fan-print-lut\n");
     printf("   Print fan LUT and exit.\n");
-    printf(" -v [integer]\n");
-    printf("   Fan speed when temperature is under -x [integer]\n");
-    printf(" -w [integer]\n");
-    printf("   Fan speed used for fan LUT calculation when temperature at -x [integer]\n");
-    printf(" -x [integer]\n");
+    printf(" -a, --fan-smooth-up=NUM\n");
+    printf("   When increasing fan RPM, go up by this much per --interval seconds.\n");
+    printf(" -b, --fan-smooth-down=NUM\n");
+    printf("   When decreasing fan RPM, go down by this much per --interval seconds.\n");
+    printf(" -v, --fan-speed-min=NUM\n");
+    printf("   Fan speed when temperature is under --fan-temp-low\n");
+    printf(" -w, --fan-speed-low=NUM\n");
+    printf("   Fan speed used for fan LUT calculation when temperature at --fan-temp-low\n");
+    printf(" -x, --fan-temp-low=NUM\n");
     printf("   Lowest temperature for fan LUT calculation.\n");
-    printf(" -y [integer]\n");
-    printf("   Fan speed used for fan LUT calculation when temperature at -z [integer]\n");
-    printf(" -z [integer]\n");
+    printf(" -y, --fan-speed-high=NUM\n");
+    printf("   Fan speed used for fan LUT calculation when temperature at --fan-temp-high\n");
+    printf(" -z, --fan-temp-high=NUM\n");
     printf("   Highest temperature for fan LUT calculation.\n");
     printf("Examples:\n");
     printf(" Show fan LUT with minimum 500RPM at 40C, maximum 1600RPM at 55C, 400RPM under 40c.\n");
-    printf("  ./vega64control -w 500 -x 40 -y 1600 -z 55 -v 400 -u\n");
+    printf("  ./vega64control --fan-speed-low=500 --fan-speed-high=1600 --fan-temp-low=40 --fan-temp-high 55 --fan-speed-min=400 --fan-print-lut\n");
     printf(" Apply pp_table, control P-States\n");
-    printf("  ./vega64control -p /etc/default/pp_table -c\n");
+    printf("  ./vega64control --pptable=/etc/default/pp_table --pstate-control\n");
 }
 
 int main(int argc, char **argv) {
@@ -373,162 +376,198 @@ int main(int argc, char **argv) {
     fprintf(stderr, "ERROR: Operating system must be Linux.\n");
     return 1;
 #endif
-    int c;
-    bool printLut = false;
     signal(SIGQUIT, cleanup);
     signal(SIGINT, cleanup);
     signal(SIGTERM, cleanup);
     signal(SIGHUP, cleanup);
-    while ((c = getopt(argc, argv, "chsua:b:d:i:n:p:v:w:x:y:z:")) != -1) {
-        switch (c) {
-            case 'a':
-                smoothUp = atoi(optarg);
-                if (smoothUp < 1) {
-                    fprintf(stderr, "ERROR: -a must be at least 1.\n");
-                    return 1;
-                }
+    {
+        bool printLut = false;
+        int option_index = 0;
+        int c;
+        static struct option long_options[] = {
+            {"help",                  no_argument,       0, 'h'},
+            {"silent",                no_argument,       0, 's'},
+            {"gpu-id",                required_argument, 0, 'd'},
+            {"pstate-control",        no_argument,       0, 'c'},
+            {"pstate-gpu-max",        required_argument, 0, 'e'},
+            {"pstate-soc-max",        required_argument, 0, 'f'},
+            {"pstate-vram-max",       required_argument, 0, 'g'},
+            {"pstate-load",           required_argument, 0, 'l'},
+            {"pstate-decrease-loops", required_argument, 0, 'r'},
+            {"pptable",               required_argument, 0, 'p'},
+            {"interval",              required_argument, 0, 'i'},
+            {"niceness",              required_argument, 0, 'n'},
+            {"fan-print-lut",         no_argument,       0, 'u'},
+            {"fan-smooth-up",         required_argument, 0, 'a'},
+            {"fan-smooth-down",       required_argument, 0, 'b'},
+            {"fan-speed-min",         required_argument, 0, 'v'},
+            {"fan-speed-low",         required_argument, 0, 'w'},
+            {"fan-temp-low",          required_argument, 0, 'x'},
+            {"fan-speed-high",        required_argument, 0, 'y'},
+            {"fan-temp-high",         required_argument, 0, 'z'},
+            {0,                       0,                 0,  0 }
+        };
+        while (c = getopt_long(argc, argv, "a:b:cd:e:f:g:hi:l:n:p:r:suv:w:x:y:z:", long_options, &option_index)) {
+            if (c == -1) {
                 break;
-            case 'b':
-                smoothDown = atoi(optarg);
-                if (smoothDown < 1) {
-                    fprintf(stderr, "ERROR: -b must be at least 1.\n");
-                    return 1;
-                }
-                break;
-            case 'c':
-                pstateControl = true;
-                break;
-            case 'd':
-                gpuID = atoi(optarg);
-                if (gpuID < 0 || gpuID > 256) {
-                    fprintf(stderr, "ERROR: Wrong GPU device id passed.\n");
-                    return 1;
-                }
-                break;
-            case 'e':
-                maxGpuState = atoi(optarg);
-                if (maxGpuState < 0 || maxGpuState > 7) {
-                    fprintf(stderr, "ERROR: GPU P-State must be between 0 and 7.\n");
-                    return 1;
-                }
-                break;
-            case 'f':
-                maxSocState = atoi(optarg);
-                if (maxSocState < 0 || maxSocState > 7) {
-                    fprintf(stderr, "ERROR: SOC P-State must be between 0 and 7.\n");
-                    return 1;
-                }
-                break;
-            case 'g':
-                maxVramState = atoi(optarg);
-                if (maxVramState < 0 || maxVramState > 3) {
-                    fprintf(stderr, "ERROR: VRAM P-State must be between 0 and 3.\n");
-                    return 1;
-                }
-                break;
-            case 'h':
-                printUsage();
-                return 0;
-            case 'i':
-                interval = atof(optarg);
-                if (!interval || interval < 0.05 || interval > 60.0) {
-                    fprintf(stderr, "ERROR: Interval must be between 0.05 and 60.0\n");
-                    return 1;
-                }
-                break;
-            case 'n':
-                int niceness = atoi(optarg);
-                if (niceness < -20 || niceness > 19) {
-                    fprintf(stderr, "ERROR: Niceness must be -20 to 19\n");
-                    return 1;
-                }
-                nice(niceness);
-                break;
-            case 'p':
-                user_pp_table = optarg;
-                if (!fileExists(user_pp_table)) {
-                    return 1;
-                }
-                break;
-            case 's':
-                silent = true;
-                break;
-            case 'u':
-                printLut = true;
-                break;
-            case 'v':
-                minFanSpeed = atoi(optarg);
-                break;
-            case 'w':
-                lowFanSpeed = atoi(optarg);
-                break;
-            case 'x':
-                lowTemp = atof(optarg);
-                if (lowTemp < 0 || lowTemp > 99) {
-                    fprintf(stderr, "ERROR: Low temperature must be between 0 and 99\n");
-                    return 1;
-                }
-                break;
-            case 'y':
-                highFanSpeed = atoi(optarg);
-                break;
-            case 'z':
-                highTemp = atoi(optarg);
-                if (highTemp < 0 || highTemp > 99) {
-                    fprintf(stderr, "ERROR: Low temperature must be between 0 and 99\n");
-                    return 1;
-                }
-                break;
+            }
+            switch (c) {
+                case 'a':
+                    smoothUp = atoi(optarg);
+                    if (smoothUp < 1) {
+                        fprintf(stderr, "ERROR: %s must be at least 1.\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'b':
+                    smoothDown = atoi(optarg);
+                    if (smoothDown < 1) {
+                        fprintf(stderr, "ERROR: %s must be at least 1.\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'c':
+                    pstateControl = true;
+                    break;
+                case 'd':
+                    gpuID = atoi(optarg);
+                    if (gpuID < 0 || gpuID > 256) {
+                        fprintf(stderr, "ERROR: Wrong GPU device id passed (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'e':
+                    maxGpuState = atoi(optarg);
+                    if (maxGpuState < 0 || maxGpuState > 7) {
+                        fprintf(stderr, "ERROR: GPU P-State must be between 0 and 7 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'f':
+                    maxSocState = atoi(optarg);
+                    if (maxSocState < 0 || maxSocState > 7) {
+                        fprintf(stderr, "ERROR: SOC P-State must be between 0 and 7 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'g':
+                    maxVramState = atoi(optarg);
+                    if (maxVramState < 0 || maxVramState > 3) {
+                        fprintf(stderr, "ERROR: VRAM P-State must be between 0 and 3 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'h':
+                    printUsage();
+                    return EXIT_SUCCESS;
+                case 'i':
+                    interval = atof(optarg);
+                    if (!interval || interval < 0.05 || interval > 60.0) {
+                        fprintf(stderr, "ERROR: Interval must be between 0.05 and 60.0 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'l':
+                    gpuLoadCheck = atoi(optarg);
+                    if (gpuLoadCheck > 100 || gpuLoadCheck < 1) {
+                        fprintf(stderr, "ERROR: -l must be between 1 and 100 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'n':
+                    int niceness = atoi(optarg);
+                    if (niceness < -20 || niceness > 19) {
+                        fprintf(stderr, "ERROR: Niceness must be -20 to 19 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    nice(niceness);
+                    break;
+                case 'p':
+                    user_pp_table = optarg;
+                    if (!fileExists(user_pp_table)) {
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 's':
+                    silent = true;
+                    break;
+                case 'u':
+                    printLut = true;
+                    break;
+                case 'v':
+                    minFanSpeed = atoi(optarg);
+                    break;
+                case 'w':
+                    lowFanSpeed = atoi(optarg);
+                    break;
+                case 'x':
+                    lowTemp = atof(optarg);
+                    if (lowTemp < 0 || lowTemp > 99) {
+                        fprintf(stderr, "ERROR: Low temperature must be between 0 and 99 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+                case 'y':
+                    highFanSpeed = atoi(optarg);
+                    break;
+                case 'z':
+                    highTemp = atoi(optarg);
+                    if (highTemp < 0 || highTemp > 99) {
+                        fprintf(stderr, "ERROR: Low temperature must be between 0 and 99 (%s).\n", long_options[option_index].name);
+                        return EXIT_FAILURE;
+                    }
+                    break;
+            }
         }
-    }
-    fanSpeedControl = highFanSpeed > 0 && highTemp > 0.0;
-    if (fanSpeedControl) {
-        if (minFanSpeed >= lowFanSpeed) {
-            fprintf(stderr, "ERROR: Min fan speed must be less than low fan speed.\n");
-            return 1;
+        fanSpeedControl = highFanSpeed > 0 && highTemp > 0.0;
+        if (fanSpeedControl) {
+            if (minFanSpeed >= lowFanSpeed) {
+                fprintf(stderr, "ERROR: Min fan speed must be less than low fan speed.\n");
+                return EXIT_FAILURE;
+            }
+            if (lowFanSpeed >= highFanSpeed) {
+                fprintf(stderr, "ERROR: Low fan speed must be less than high fan speed.\n");
+                return EXIT_FAILURE;
+            }
+            if (lowFanSpeed < 0 || highFanSpeed > 10000) {
+                fprintf(stderr, "ERROR: Fan speed values must be between 0 and 10000.\n");
+                return EXIT_FAILURE;
+            }
+            mkFanLut(printLut);
+            if (printLut) {
+                return EXIT_SUCCESS;
+            }
+            if (!silent) {
+                printf("Manual fan control enabled.\n");
+            }
         }
-        if (lowFanSpeed >= highFanSpeed) {
-            fprintf(stderr, "ERROR: Low fan speed must be less than high fan speed.\n");
-            return 1;
+        if (geteuid() != 0) {
+            fprintf(stderr, "ERROR: Must be run as root.\n");
+            return EXIT_FAILURE;
         }
-        if (lowFanSpeed < 0 || highFanSpeed > 10000) {
-            fprintf(stderr, "ERROR: Fan speed values must be between 0 and 10000.\n");
-            return 1;
+        if (!getDevPath()) {
+            return EXIT_FAILURE;
         }
-        mkFanLut(printLut);
-        if (printLut) {
-            return 0;
+        if (!getHwmonPath()) {
+            fprintf(stderr, "ERROR: Could not find hwmon path for GPU.\n");
+            return EXIT_FAILURE;
         }
-        if (!silent) {
-            printf("Manual fan control enabled.\n");
+        if (!checkFiles()) {
+            fprintf(stderr, "ERROR: Could not open a required file.\n");
+            return EXIT_FAILURE;
         }
-    }
-    if (geteuid() != 0) {
-        fprintf(stderr, "ERROR: Must be run as root.\n");
-        return 1;
-    }
-    if (!getDevPath()) {
-        return 1;
-    }
-    if (!getHwmonPath()) {
-        fprintf(stderr, "ERROR: Could not find hwmon path for GPU.\n");
-        return 1;
-    }
-    if (!checkFiles()) {
-        fprintf(stderr, "ERROR: Could not open a required file.\n");
-        return 1;
-    }
-    if (pstateControl) {
-        if (!silent) {
-            printf("Enabling manual GPU P-State control.\n");
+        if (pstateControl) {
+            if (!silent) {
+                printf("Enabling manual GPU P-State control.\n");
+            }
+            writeFile(power_dpm_force_performance_level, "manual");
         }
-        writeFile(power_dpm_force_performance_level, "manual");
-    }
-    if (user_pp_table) {
-        if (!silent) {
-            printf("Copying power play table: '%s' -> '%s'\n", user_pp_table, pp_table);
+        if (user_pp_table) {
+            if (!silent) {
+                printf("Copying power play table: '%s' -> '%s'\n", user_pp_table, pp_table);
+            }
+            setPPTable();
         }
-        setPPTable();
     }
     int i = 0;
     while (1) {
@@ -539,7 +578,7 @@ int main(int argc, char **argv) {
             setPstates();
             // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
             if (user_pp_table && vramPstate == 0) {
-                if (i++ > 20 && readFile(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+                if (i++ > 30 && readFile(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
                     setPPTable();
                     i = 0;
                 }
@@ -549,5 +588,5 @@ int main(int argc, char **argv) {
         }
         sleep(interval);
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
