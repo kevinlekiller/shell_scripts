@@ -45,7 +45,7 @@ FFMPEGNICE=${FFMPEGNICE:-19}
 # Set the amount of threads used by ffmpeg. Setting to 0, ffmpeg will automatically use the optimal amount of threads.
 FFMPEGTHREADS=${FFMPEGTHREADS:-0}
 # lixb265 CRF value ; ffmpeg default is 28, lower number results in higher image quality
-FFMPEGCRF=${FFMPEGCRF:-20}
+FFMPEGCRF=${FFMPEGCRF:-19}
 # libx265 preset value ; ffmpeg default is medium ; see x265 manual for valid values
 FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
@@ -214,7 +214,7 @@ for inFile in **; do
         -stats -hide_banner -y \
         -i "$inFile" \
         -vf "$VFTEMP" \
-        -c copy \
+        -c:d copy -c:s copy -c:a copy \
         -c:v libx265 \
         $FFMPEGEXTRA \
         -preset "$FFMPEGPRESET" \
