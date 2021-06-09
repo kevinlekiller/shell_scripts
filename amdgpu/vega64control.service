@@ -3,7 +3,7 @@ Description=Controls the fanspeed and P-States of the AMD VEGA GPU.
 After=graphical.target
 
 [Service]
-ExecStart=/usr/local/bin/vega64control -p/etc/default/pp_table -v400 -w500 -x40 -y1600 -z55 -b10 -c -s -n10
+ExecStart=/usr/local/bin/vega64control -p/etc/default/pp_table --fan-speed-min=400 --fan-speed-low=500 --fan-speed-high=1600 --fan-temp-low=40 --fan-temp-high=55 --fan-smooth-down=10 --pstate-control --niceness=10 --pptable=/etc/default/pp_table --silent
 Type=simple
 Restart=always
 RestartSec=5
