@@ -125,9 +125,6 @@ void setVramPstate() {
             vramPstate = 0;
             break;
     }
-    if (vramPstate > maxVramState) {
-        vramPstate = maxVramState;
-    }
     sprintf(buf, "%d", vramPstate);
     writeFile(pp_dpm_mclk, buf);
 }
@@ -142,14 +139,14 @@ void setPstates() {
             socPstate++;
             sprintf(buf, "%d", socPstate);
             writeFile(pp_dpm_socclk, buf);
+            if (vramPstate < maxVramState) {
+                setVramPstate();
+            }
         }
         if (gpuPstate < maxGpuState) {
             gpuPstate++;
             sprintf(buf, "%d", gpuPstate);
             writeFile(pp_dpm_sclk, buf);
-        }
-        if (vramPstate < maxVramState) {
-            setVramPstate();
         }
         if (!silent) {
             printf ("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
@@ -160,13 +157,13 @@ void setPstates() {
             socPstate--;
             sprintf(buf, "%d", socPstate);
             writeFile(pp_dpm_socclk, buf);
+            setVramPstate();
         }
         if (gpuPstate > 0) {
             gpuPstate--;
             sprintf(buf, "%d", gpuPstate);
             writeFile(pp_dpm_sclk, buf);
         }
-        setVramPstate();
         if (!silent) {
             printf ("\nDecreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
