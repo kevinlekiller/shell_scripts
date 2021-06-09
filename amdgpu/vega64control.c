@@ -191,7 +191,6 @@ void setFanSpeed() {
         tmpSpeed = lastFanSpeed + smoothUp;
     }
     if (tmpSpeed != lastFanSpeed) {
-        writeFile(fan1_enable, "1");
         sprintf(buf, "%d", tmpSpeed);
         writeFile(fan1_target, buf);
     }
@@ -305,6 +304,10 @@ bool getDevPath(char * devPath, int gpuID) {
 void setPPTable() {
     sprintf(buf, "cp \"%s\" \"%s\"", user_pp_table, pp_table);
     system(buf);
+    if (fanSpeedControl) { // Setting the pp_table seems to reset fan1_enable to 0 sometimes.
+        writeFile(fan1_enable, "1");
+        lastFanSpeed = 0;
+    }
 }
 
 bool getHwmonPath(char * devPath, char * hwmonPath) {
@@ -547,28 +550,6 @@ int main(int argc, char **argv) {
                     break;
             }
         }
-        fanSpeedControl = highFanSpeed > 0 && highTemp > 0;
-        if (fanSpeedControl) {
-            if (minFanSpeed >= lowFanSpeed) {
-                fprintf(stderr, "ERROR: --fan-speed-min must be less than --fan-speed-low.\n");
-                return EXIT_FAILURE;
-            }
-            if (lowFanSpeed >= highFanSpeed) {
-                fprintf(stderr, "ERROR: --fan-speed-low must be less than -fan-speed-high.\n");
-                return EXIT_FAILURE;
-            }
-            if (lowFanSpeed == 0 || highFanSpeed > 10000) {
-                fprintf(stderr, "ERROR: Fan speed values must be between 0 and 10000.\n");
-                return EXIT_FAILURE;
-            }
-            mkFanLut(printLut);
-            if (printLut) {
-                return EXIT_SUCCESS;
-            }
-            if (!silent) {
-                printf("Manual fan control enabled.\n");
-            }
-        }
         if (geteuid() != 0) {
             fprintf(stderr, "ERROR: vega64control must be run as root.\n");
             return EXIT_FAILURE;
@@ -587,6 +568,29 @@ int main(int argc, char **argv) {
         if (!checkFiles(devPathptr, hwmonPathptr)) {
             fprintf(stderr, "ERROR: Could not open a required file.\n");
             return EXIT_FAILURE;
+        }
+        fanSpeedControl = highFanSpeed > 0 && highTemp > 0;
+        if (fanSpeedControl) {
+            if (minFanSpeed >= lowFanSpeed) {
+                fprintf(stderr, "ERROR: --fan-speed-min must be less than --fan-speed-low.\n");
+                return EXIT_FAILURE;
+            }
+            if (lowFanSpeed >= highFanSpeed) {
+                fprintf(stderr, "ERROR: --fan-speed-low must be less than -fan-speed-high.\n");
+                return EXIT_FAILURE;
+            }
+            if (lowFanSpeed == 0 || highFanSpeed > 10000) {
+                fprintf(stderr, "ERROR: Fan speed values must be between 0 and 10000.\n");
+                return EXIT_FAILURE;
+            }
+            mkFanLut(printLut);
+            if (printLut) {
+                return EXIT_SUCCESS;
+            }
+            writeFile(fan1_enable, "1");
+            if (!silent) {
+                printf("Manual fan control enabled.\n");
+            }
         }
         if (pstateControl) {
             if (!silent) {
