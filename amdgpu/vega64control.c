@@ -190,9 +190,11 @@ void setFanSpeed() {
     } else if (smoothUp && tmpSpeed > lastFanSpeed) {
         tmpSpeed = lastFanSpeed + smoothUp;
     }
-    writeFile(fan1_enable, "1");
-    sprintf(buf, "%d", tmpSpeed);
-    writeFile(fan1_target, buf);
+    if (tmpSpeed != lastFanSpeed) {
+        writeFile(fan1_enable, "1");
+        sprintf(buf, "%d", tmpSpeed);
+        writeFile(fan1_target, buf);
+    }
     if (!silent) {
         printf("\rGpu Temp %2d C -> Fan Speed %4d RPM", gpuTemp, tmpSpeed);
         fflush(stdout);
