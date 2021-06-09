@@ -44,7 +44,7 @@
 #include <sys/stat.h>
 
 unsigned char iters = 0, lowTemp = 0, highTemp = 0;
-unsigned char gpuPstate = 0, gpuLoadCheck = 50, iterLimit = 10, socPstate, vramPstate = 0;
+unsigned char gpuLoadCheck = 50, iterLimit = 10, gpuPstate = 0, socPstate = 0, vramPstate = 0;
 unsigned char maxGpuState = 7, maxSocState = 7, maxVramState = 3, smoothUp = 0, smoothDown = 0;
 unsigned short highFanSpeed = 0, lowFanSpeed = 0, minFanSpeed = 0, lastFanSpeed = 0;
 bool fanSpeedControl, pstateControl = false, silent = false;
@@ -177,7 +177,7 @@ void setFanSpeed() {
     if (!readFile(temp1_input, 6)) {
         return;
     }
-    int tmpSpeed = 0, gpuTemp =  (int) round(atof(buf) / 1000.0);
+    int tmpSpeed, gpuTemp =  (int) round(atof(buf) / 1000.0);
     if (gpuTemp < lowTemp) {
         tmpSpeed = minFanSpeed;
     } else if (fanLut[gpuTemp]) {
@@ -246,7 +246,7 @@ bool fileExists(const char * path) {
 }
 
 bool checkFiles(char * devPath, char * hwmonPath) {
-    char tmpPath[100];
+    char tmpPath[64];
     const char devFiles[][35] = {
         "gpu_busy_percent",
         "power_dpm_force_performance_level",
