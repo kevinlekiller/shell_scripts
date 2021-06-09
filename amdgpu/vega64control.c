@@ -106,20 +106,20 @@ void cleanup() {
 }
 
 void setVramPstate() {
-    switch (socPstate) {
+    switch (socPstate) { // This is how my GPU behaves, might vary based on pp_table.
         case 7:
         case 6:
             vramPstate = 3;
             break;
         case 5:
         case 4:
-            vramPstate = 2;
-            break;
         case 3:
         case 2:
-            vramPstate = 1;
+            vramPstate = 2;
             break;
         case 1:
+            vramPstate = 1;
+            break;
         case 0:
         default:
             vramPstate = 0;
@@ -148,7 +148,9 @@ void setPstates() {
             sprintf(buf, "%d", gpuPstate);
             writeFile(pp_dpm_sclk, buf);
         }
-        setVramPstate();
+        if (vramPstate < maxVramState) {
+            setVramPstate();
+        }
         if (!silent) {
             printf ("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
