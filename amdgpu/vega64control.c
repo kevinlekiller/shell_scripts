@@ -136,6 +136,7 @@ void setPstates() {
     if (atoi(buf) >= gpuLoadCheck) {
         iters = 0;
         if (socPstate < maxSocState) {
+            iters = 1;
             socPstate++;
             sprintf(buf, "%d", socPstate);
             writeFile(pp_dpm_socclk, buf);
@@ -144,13 +145,15 @@ void setPstates() {
             }
         }
         if (gpuPstate < maxGpuState) {
+            iters = 1;
             gpuPstate++;
             sprintf(buf, "%d", gpuPstate);
             writeFile(pp_dpm_sclk, buf);
         }
-        if (!silent) {
+        if (!silent && iters) {
             printf ("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
+        iters = 0;
     } else if ((gpuPstate > 0 || socPstate > 0) && iters++ >= iterLimit) {
         iters = 0;
         if (socPstate > 0) {
