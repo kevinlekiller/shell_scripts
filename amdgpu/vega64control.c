@@ -61,22 +61,30 @@ char fan1_enable[57];
 char fan1_target[57];
 char temp1_input[57];
 char buf[256];
+FILE *file;
 
-void writeFile(const char * path, const char * value) {
-    FILE *file = fopen(path, "r+");
-    fseek(file, 0, SEEK_SET);
-    fputs(value, file);
-    fseek(file, 0, SEEK_SET);
+bool writeFile(const char * path, const char * value) {
+    file = fopen(path, "r+");
+    if (file == NULL) {
+        return false;
+    }
+    if (fseek(file, 0, SEEK_SET) != 0 || fputs(value, file) < 0 || fseek(file, 0, SEEK_SET) != 0){
+        fclose(file);
+        return false;
+    }
     fclose(file);
+    return true;
 }
 
 bool readFile(const char * path, size_t size) {
-    FILE *file = fopen(path, "r");
-    fseek(file, 0, SEEK_SET);
-    if (fgets(buf, size, file) == NULL) {
+    file = fopen(path, "r");
+    if (file == NULL) {
         return false;
     }
-    fseek(file, 0, SEEK_END);
+    if (fseek(file, 0, SEEK_SET) != 0 || fgets(buf, size, file) == NULL || fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return false;
+    }
     fclose(file);
     return true;
 }
