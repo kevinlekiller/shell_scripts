@@ -187,8 +187,14 @@ void setFanSpeed() {
     }
     if (smoothDown && tmpSpeed < lastFanSpeed) {
         tmpSpeed = lastFanSpeed - smoothDown;
+        if (tmpSpeed < minFanSpeed) {
+            tmpSpeed = minFanSpeed;
+        }
     } else if (smoothUp && tmpSpeed > lastFanSpeed) {
         tmpSpeed = lastFanSpeed + smoothUp;
+        if (tmpSpeed > highFanSpeed) {
+            tmpSpeed = highFanSpeed;
+        }
     }
     if (tmpSpeed != lastFanSpeed) {
         sprintf(buf, "%d", tmpSpeed);
