@@ -175,28 +175,27 @@ void setFanSpeed() {
     if (!readFile(temp1_input, 6)) {
         return;
     }
-    int gpuTemp =  (int) round(atof(buf) / 1000.0);
-    char fanSpeed[4] = "0";
+    int tmpSpeed = 0, gpuTemp =  (int) round(atof(buf) / 1000.0);
     if (gpuTemp < lowTemp) {
-        sprintf(fanSpeed, "%d", minFanSpeed);
+        tmpSpeed = minFanSpeed;
     } else if (fanLut[gpuTemp]) {
-        sprintf(fanSpeed, "%d", fanLut[gpuTemp]);
+        tmpSpeed = fanLut[gpuTemp];
     } else {
-        sprintf(fanSpeed, "%d", highFanSpeed);
+        tmpSpeed = highFanSpeed;
     }
-    int tmpSpeed = atoi(fanSpeed);
     if (smoothDown && tmpSpeed < lastFanSpeed) {
-        sprintf(fanSpeed, "%d", lastFanSpeed - smoothDown);
+        tmpSpeed = lastFanSpeed - smoothDown;
     } else if (smoothUp && tmpSpeed > lastFanSpeed) {
-        sprintf(fanSpeed, "%d", lastFanSpeed + smoothUp);
+        tmpSpeed = lastFanSpeed + smoothUp;
     }
     writeFile(fan1_enable, "1");
-    writeFile(fan1_target, fanSpeed);
-    lastFanSpeed = atoi(fanSpeed);
+    sprintf(buf, "%d", tmpSpeed);
+    writeFile(fan1_target, buf);
     if (!silent) {
-        printf("\rGpu Temp %2d C -> Fan Speed %4d RPM", gpuTemp, lastFanSpeed);
+        printf("\rGpu Temp %2d C -> Fan Speed %4d RPM", gpuTemp, tmpSpeed);
         fflush(stdout);
     }
+    lastFanSpeed = tmpSpeed;
 }
 
 void mkFanLut(bool printLut) {
