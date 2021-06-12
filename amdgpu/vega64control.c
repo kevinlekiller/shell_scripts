@@ -43,7 +43,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-unsigned char iters = 0, lowTemp = 0, highTemp = 0;
+unsigned char iters = 0, lowTemp = 0, highTemp = 0, stuckIterChk = 60, stuckIters = 0;
 unsigned char gpuLoadCheck = 50, iterLimit = 10, gpuPstate = 0, socPstate = 0, vramPstate = 0;
 unsigned char maxGpuState = 7, maxSocState = 7, maxVramState = 3, smoothUp = 0, smoothDown = 0;
 unsigned short highFanSpeed = 0, lowFanSpeed = 0, minFanSpeed = 0, lastFanSpeed = 0;
@@ -77,22 +77,9 @@ bool writeFile(const char * path, const char * value) {
 }
 
 bool readFile(FILE * fp, size_t size) {
-    if (fseek(fp, 0, SEEK_SET) != 0 || fgets(buf, size, fp) == NULL || fseek(fp, 0, SEEK_END) != 0) {
+    if (fseek(fp, 0, SEEK_SET) != 0 || fread(buf, 1, size, fp) < 1) {
         return false;
     }
-    return true;
-}
-
-bool readFileOpen(const char * path, size_t size) {
-    file = fopen(path, "r");
-    if (file == NULL) {
-        return false;
-    }
-    if (!readFile(file, size)) {
-        fclose(file);
-        return false;
-    }
-    fclose(file);
     return true;
 }
 
@@ -143,7 +130,7 @@ void setVramPstate() {
 }
 
 void setPstates() {
-    if (!readFile(gpuLoadFile, 3)) {
+    if (!readFile(gpuLoadFile, 4)) {
         return;
     }
     if (atoi(buf) >= gpuLoadCheck) {
@@ -187,7 +174,7 @@ void setPstates() {
 }
 
 void setFanSpeed() {
-    if (!readFile(tempFile, 6)) {
+    if (!readFile(tempFile, 7)) {
         return;
     }
     int tmpSpeed, gpuTemp =  (int) round(atof(buf) / 1000.0);
@@ -335,6 +322,29 @@ void setPPTable() {
     }
 }
 
+void checkStuckMclk() {
+    // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
+    if (!user_pp_table) {
+        return;
+    }
+    if (vramPstate != 0) {
+        stuckIters = 0;
+        return;
+    }
+    if (stuckIters++ <= stuckIterChk) {
+        return;
+    }
+    file = fopen(pp_dpm_mclk, "r");
+    if (file == NULL) {
+        return;
+    }
+    if (readFile(file, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+        setPPTable();
+    }
+    fclose(file);
+    stuckIters = 0;
+}
+
 bool getHwmonPath(char * devPath, char * hwmonPath) {
     sprintf(hwmonPath, "%s/hwmon", devPath);
     DIR *dir = opendir(hwmonPath);
@@ -421,7 +431,6 @@ int main(int argc, char **argv) {
     signal(SIGINT, cleanup);
     signal(SIGTERM, cleanup);
     signal(SIGHUP, cleanup);
-    unsigned char stuckIterChk = 60, stuckIters = 0;
     {
         bool printLut = false;
         int c, gpuID = 0;
@@ -636,15 +645,7 @@ int main(int argc, char **argv) {
         }
         if (pstateControl) {
             setPstates();
-            // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
-            if (user_pp_table && vramPstate == 0) {
-                if (stuckIters++ > stuckIterChk && readFileOpen(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
-                    setPPTable();
-                    stuckIters = 0;
-                }
-            } else {
-                stuckIters = 0;
-            }
+            checkStuckMclk();
         }
         sleep(interval);
     }
