@@ -339,7 +339,8 @@ int main(int argc, char **argv) {
                     }
                     nice(niceness);
                     break;
-                case 'u':
+                case 's':
+                    silent = true;
                     break;
             }
         }
