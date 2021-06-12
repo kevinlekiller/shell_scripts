@@ -3,7 +3,7 @@ Description=Controls the fanspeed of the chassis fans.
 After=local-fs.target
 
 [Service]
-ExecStart=/usr/local/bin/cfancontrol cfancontrol --fan-smooth-up=20 --fan-smooth-down=10 --fan-speed-min=0 --fan-speed-low=45 --fan-temp-low=50 --fan-speed-high=255 --fan-temp-high=77 --interval=2.0
+ExecStart=/usr/local/bin/cfancontrol --fan-smooth-up=20 --fan-smooth-down=10 --fan-speed-min=0 --fan-speed-low=45 --fan-temp-low=50 --fan-speed-high=255 --fan-temp-high=77 --interval=2.0
 Type=simple
 Restart=always
 RestartSec=5
