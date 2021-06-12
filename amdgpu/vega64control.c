@@ -336,6 +336,7 @@ void checkStuckMclk() {
     }
     file = fopen(pp_dpm_mclk, "r");
     if (file == NULL) {
+        stuckIters = 0;
         return;
     }
     if (readFile(file, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
