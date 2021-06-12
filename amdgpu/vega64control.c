@@ -51,7 +51,6 @@ bool fanSpeedControl, pstateControl = false, silent = false;
 float interval = 1.0;
 const char * user_pp_table;
 int fanLut[99];
-char gpu_busy_percent[47];
 char power_dpm_force_performance_level[64];
 char pp_dpm_mclk[42];
 char pp_dpm_sclk[42];
@@ -59,9 +58,10 @@ char pp_dpm_socclk[44];
 char pp_table[39];
 char fan1_enable[57];
 char fan1_target[57];
-char temp1_input[57];
 char buf[256];
-FILE *file;
+FILE * file;
+FILE * tempFile;
+FILE * gpuLoadFile;
 
 bool writeFile(const char * path, const char * value) {
     file = fopen(path, "r+");
@@ -76,12 +76,19 @@ bool writeFile(const char * path, const char * value) {
     return true;
 }
 
-bool readFile(const char * path, size_t size) {
+bool readFile(FILE * fp, size_t size) {
+    if (fseek(fp, 0, SEEK_SET) != 0 || fgets(buf, size, fp) == NULL || fseek(fp, 0, SEEK_END) != 0) {
+        return false;
+    }
+    return true;
+}
+
+bool readFileOpen(const char * path, size_t size) {
     file = fopen(path, "r");
     if (file == NULL) {
         return false;
     }
-    if (fseek(file, 0, SEEK_SET) != 0 || fgets(buf, size, file) == NULL || fseek(file, 0, SEEK_END) != 0) {
+    if (!readFile(file, size)) {
         fclose(file);
         return false;
     }
@@ -90,6 +97,12 @@ bool readFile(const char * path, size_t size) {
 }
 
 void cleanup() {
+    if (tempFile != NULL) {
+        fclose(tempFile);
+    }
+    if (gpuLoadFile != NULL) {
+        fclose(gpuLoadFile);
+    }
     if (fanSpeedControl) {
         if (!silent) {
             printf("\nEnabling automatic fan control\n");
@@ -130,7 +143,7 @@ void setVramPstate() {
 }
 
 void setPstates() {
-    if (!readFile(gpu_busy_percent, 3)) {
+    if (!readFile(gpuLoadFile, 3)) {
         return;
     }
     if (atoi(buf) >= gpuLoadCheck) {
@@ -174,7 +187,7 @@ void setPstates() {
 }
 
 void setFanSpeed() {
-    if (!readFile(temp1_input, 6)) {
+    if (!readFile(tempFile, 6)) {
         return;
     }
     int tmpSpeed, gpuTemp =  (int) round(atof(buf) / 1000.0);
@@ -273,7 +286,10 @@ bool checkFiles(char * devPath, char * hwmonPath) {
         if (!fileExists(tmpPath)) {
             return false;
         } else if (strcmp(devFiles[i], "gpu_busy_percent") == 0) {
-            sprintf(gpu_busy_percent, "%s", tmpPath);
+            gpuLoadFile = fopen(tmpPath, "r");
+            if (gpuLoadFile == NULL) {
+                return false;
+            }
         } else if (strcmp(devFiles[i], "power_dpm_force_performance_level") == 0) {
             sprintf(power_dpm_force_performance_level, "%s", tmpPath);
         } else if (strcmp(devFiles[i], "pp_dpm_mclk") == 0) {
@@ -296,7 +312,10 @@ bool checkFiles(char * devPath, char * hwmonPath) {
         } else if (strcmp(hwmonFiles[i], "fan1_target") == 0) {
             sprintf(fan1_target, "%s", tmpPath);
         } else if (strcmp(hwmonFiles[i], "temp1_input") == 0) {
-            sprintf(temp1_input, "%s", tmpPath);
+            tempFile = fopen(tmpPath, "r");
+            if (tempFile == NULL) {
+                return false;
+            }
         }
     }
     return true;
@@ -619,7 +638,7 @@ int main(int argc, char **argv) {
             setPstates();
             // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
             if (user_pp_table && vramPstate == 0) {
-                if (stuckIters++ > stuckIterChk && readFile(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+                if (stuckIters++ > stuckIterChk && readFileOpen(pp_dpm_mclk, 12) && strncmp("0: 167Mhz *", buf, 11) != 0) {
                     setPPTable();
                     stuckIters = 0;
                 }
