@@ -51,28 +51,21 @@ bool fanSpeedControl, pstateControl = false, silent = false;
 float interval = 1.0;
 const char * user_pp_table;
 int fanLut[99];
-char power_dpm_force_performance_level[64];
-char pp_dpm_mclk[42];
-char pp_dpm_sclk[42];
-char pp_dpm_socclk[44];
-char pp_table[39];
-char fan1_enable[57];
-char fan1_target[57];
+FILE * gpu_busy_percent;
+FILE * power_dpm_force_performance_level;
+FILE * pp_dpm_mclk;
+FILE * pp_dpm_sclk;
+FILE * pp_dpm_socclk;
+FILE * fan1_enable;
+FILE * fan1_target;
+FILE * temp1_input;
 char buf[256];
-FILE * file;
-FILE * tempFile;
-FILE * gpuLoadFile;
+char pp_table[39];
 
-bool writeFile(const char * path, const char * value) {
-    file = fopen(path, "r+");
-    if (file == NULL) {
+bool writeFile(FILE * fp, const char * value) {
+    if (fputs(value, fp) < 0 || fseek(fp, 0, SEEK_SET) != 0){
         return false;
     }
-    if (fseek(file, 0, SEEK_SET) != 0 || fputs(value, file) < 0 || fseek(file, 0, SEEK_SET) != 0){
-        fclose(file);
-        return false;
-    }
-    fclose(file);
     return true;
 }
 
@@ -84,12 +77,6 @@ bool readFile(FILE * fp, size_t size) {
 }
 
 void cleanup() {
-    if (tempFile != NULL) {
-        fclose(tempFile);
-    }
-    if (gpuLoadFile != NULL) {
-        fclose(gpuLoadFile);
-    }
     if (fanSpeedControl) {
         if (!silent) {
             printf("\nEnabling automatic fan control\n");
@@ -101,6 +88,30 @@ void cleanup() {
             printf("Enabling automatic P-State control.\n");
         }
         writeFile(power_dpm_force_performance_level, "auto");
+    }
+    if (gpu_busy_percent != NULL) {
+        fclose(gpu_busy_percent);
+    }
+    if (power_dpm_force_performance_level != NULL) {
+        fclose(power_dpm_force_performance_level);
+    }
+    if (pp_dpm_mclk != NULL) {
+        fclose(pp_dpm_mclk);
+    }
+    if (pp_dpm_sclk != NULL) {
+        fclose(pp_dpm_sclk);
+    }
+    if (pp_dpm_socclk != NULL) {
+        fclose(pp_dpm_socclk);
+    }
+    if (fan1_enable != NULL) {
+        fclose(fan1_enable);
+    }
+    if (fan1_target != NULL) {
+        fclose(fan1_target);
+    }
+    if (temp1_input != NULL) {
+        fclose(temp1_input);
     }
     exit(EXIT_SUCCESS);
 }
@@ -130,7 +141,7 @@ void setVramPstate() {
 }
 
 void setPstates() {
-    if (!readFile(gpuLoadFile, 4)) {
+    if (!readFile(gpu_busy_percent, 4)) {
         return;
     }
     if (atoi(buf) >= gpuLoadCheck) {
@@ -174,7 +185,7 @@ void setPstates() {
 }
 
 void setFanSpeed() {
-    if (!readFile(tempFile, 7)) {
+    if (!readFile(temp1_input, 7)) {
         return;
     }
     int tmpSpeed, gpuTemp =  (int) round(atof(buf) / 1000.0);
@@ -272,35 +283,59 @@ bool checkFiles(char * devPath, char * hwmonPath) {
         sprintf(tmpPath, "%s/%s", devPath, devFiles[i]);
         if (!fileExists(tmpPath)) {
             return false;
+        } else if (strcmp(devFiles[i], "pp_table") == 0) {
+            sprintf(pp_table, "%s", tmpPath);
+        } else if (!pstateControl) {
+            break;
         } else if (strcmp(devFiles[i], "gpu_busy_percent") == 0) {
-            gpuLoadFile = fopen(tmpPath, "r");
-            if (gpuLoadFile == NULL) {
+            gpu_busy_percent = fopen(tmpPath, "r");
+            if (gpu_busy_percent == NULL) {
                 return false;
             }
         } else if (strcmp(devFiles[i], "power_dpm_force_performance_level") == 0) {
-            sprintf(power_dpm_force_performance_level, "%s", tmpPath);
+            power_dpm_force_performance_level = fopen(tmpPath, "r+");
+            if (power_dpm_force_performance_level == NULL) {
+                return false;
+            }
         } else if (strcmp(devFiles[i], "pp_dpm_mclk") == 0) {
-            sprintf(pp_dpm_mclk, "%s", tmpPath);
+            pp_dpm_mclk = fopen(tmpPath, "r+");
+            if (pp_dpm_mclk == NULL) {
+                return false;
+            }
         } else if (strcmp(devFiles[i], "pp_dpm_sclk") == 0) {
-            sprintf(pp_dpm_sclk, "%s", tmpPath);
+            pp_dpm_sclk = fopen(tmpPath, "r+");
+            if (pp_dpm_sclk == NULL) {
+                return false;
+            }
         } else if (strcmp(devFiles[i], "pp_dpm_socclk") == 0) {
-            sprintf(pp_dpm_socclk, "%s", tmpPath);
-        } else if (strcmp(devFiles[i], "pp_table") == 0) {
-            sprintf(pp_table, "%s", tmpPath);
+            pp_dpm_socclk = fopen(tmpPath, "r+");
+            if (pp_dpm_socclk == NULL) {
+                return false;
+            }
         }
+    }
+    if (!fanSpeedControl) {
+        return true;
     }
     arrSize = sizeof(hwmonFiles) / sizeof(hwmonFiles[0]);
     for (i = 0; i < arrSize; i++) {
+        
         sprintf(tmpPath, "%s/%s", hwmonPath, hwmonFiles[i]);
         if (!fileExists(tmpPath)) {
             return false;
         } else if (strcmp(hwmonFiles[i], "fan1_enable") == 0) {
-            sprintf(fan1_enable, "%s", tmpPath);
+            fan1_enable = fopen(tmpPath, "r+");
+            if (fan1_enable == NULL) {
+                return false;
+            }
         } else if (strcmp(hwmonFiles[i], "fan1_target") == 0) {
-            sprintf(fan1_target, "%s", tmpPath);
+            fan1_target = fopen(tmpPath, "r+");
+            if (fan1_target == NULL) {
+                return false;
+            }
         } else if (strcmp(hwmonFiles[i], "temp1_input") == 0) {
-            tempFile = fopen(tmpPath, "r");
-            if (tempFile == NULL) {
+            temp1_input = fopen(tmpPath, "r");
+            if (temp1_input == NULL) {
                 return false;
             }
         }
@@ -334,15 +369,9 @@ void checkStuckMclk() {
     if (stuckIters++ <= stuckIterChk) {
         return;
     }
-    file = fopen(pp_dpm_mclk, "r");
-    if (file == NULL) {
-        stuckIters = 0;
-        return;
-    }
-    if (readFile(file, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+    if (readFile(pp_dpm_mclk, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
         setPPTable();
     }
-    fclose(file);
     stuckIters = 0;
 }
 
@@ -600,11 +629,11 @@ int main(int argc, char **argv) {
             fprintf(stderr, "ERROR: Could not find hwmon path for GPU.\n");
             return EXIT_FAILURE;
         }
+        fanSpeedControl = highFanSpeed > 0 && highTemp > 0;
         if (!checkFiles(devPathptr, hwmonPathptr)) {
             fprintf(stderr, "ERROR: Could not open a required file.\n");
             return EXIT_FAILURE;
         }
-        fanSpeedControl = highFanSpeed > 0 && highTemp > 0;
         if (fanSpeedControl) {
             if (minFanSpeed >= lowFanSpeed) {
                 fprintf(stderr, "ERROR: --fan-speed-min must be less than --fan-speed-low.\n");
@@ -640,7 +669,7 @@ int main(int argc, char **argv) {
             setPPTable();
         }
     }
-    while (1) {
+    while (pstateControl || fanSpeedControl) {
         if (fanSpeedControl) {
             setFanSpeed();
         }
