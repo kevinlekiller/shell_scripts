@@ -140,6 +140,15 @@ void setVramPstate() {
     writeFile(pp_dpm_mclk, buf);
 }
 
+void setPPTable() {
+    sprintf(buf, "cp \"%s\" \"%s\"", user_pp_table, pp_table);
+    system(buf);
+    if (fanSpeedControl) { // Setting the pp_table seems to reset fan1_enable to 0 sometimes.
+        writeFile(fan1_enable, "1");
+        lastFanSpeed = 0;
+    }
+}
+
 void setPstates() {
     if (!readFile(gpu_busy_percent, 4)) {
         return;
@@ -162,10 +171,13 @@ void setPstates() {
             writeFile(pp_dpm_sclk, buf);
         }
         if (!silent && iters) {
-            printf ("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
+            printf("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
         iters = 0;
-    } else if ((gpuPstate > 0 || socPstate > 0) && iters++ >= iterLimit) {
+    } else if (gpuPstate > 0 || socPstate > 0) {
+        if (iters++ <= iterLimit) {
+            return;
+        }
         iters = 0;
         if (socPstate > 0) {
             socPstate--;
@@ -179,8 +191,18 @@ void setPstates() {
             writeFile(pp_dpm_sclk, buf);
         }
         if (!silent) {
-            printf ("\nDecreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
+            printf("\nDecreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
         }
+    // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
+    } else if (user_pp_table != NULL && stuckIters++ >= stuckIterChk) {
+        if (readFile(pp_dpm_mclk, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
+            if (!silent) {
+                printf("\nVRAM P-State Stuck, copying pp_table.\n");
+            }
+            setPPTable();
+            vramPstate = 0;
+        }
+        stuckIters = 0;
     }
 }
 
@@ -346,33 +368,6 @@ bool checkFiles(char * devPath, char * hwmonPath) {
 bool getDevPath(char * devPath, int gpuID) {
     sprintf(devPath, "/sys/class/drm/card%d/device", gpuID);
     return dirExists(devPath, true);
-}
-
-void setPPTable() {
-    sprintf(buf, "cp \"%s\" \"%s\"", user_pp_table, pp_table);
-    system(buf);
-    if (fanSpeedControl) { // Setting the pp_table seems to reset fan1_enable to 0 sometimes.
-        writeFile(fan1_enable, "1");
-        lastFanSpeed = 0;
-    }
-}
-
-void checkStuckMclk() {
-    // Check if VRAM P-State is stuck, copying the pp_table seems to fix the issue.
-    if (!user_pp_table) {
-        return;
-    }
-    if (vramPstate != 0) {
-        stuckIters = 0;
-        return;
-    }
-    if (stuckIters++ <= stuckIterChk) {
-        return;
-    }
-    if (readFile(pp_dpm_mclk, 13) && strncmp("0: 167Mhz *", buf, 11) != 0) {
-        setPPTable();
-    }
-    stuckIters = 0;
 }
 
 bool getHwmonPath(char * devPath, char * hwmonPath) {
@@ -675,7 +670,6 @@ int main(int argc, char **argv) {
         }
         if (pstateControl) {
             setPstates();
-            checkStuckMclk();
         }
         sleep(interval);
     }
