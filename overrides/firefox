@@ -2,9 +2,12 @@
 
 if [[ $XDG_SESSION_TYPE == x11 ]]; then
     MOZ_X11_EGL=1 firejail /usr/bin/firefox "$@"
+    #flatpak --env=MOZ_X11_EGL=1 run org.mozilla.firefox "$@"
 elif [[ $XDG_SESSION_TYPE == wayland ]]; then
     GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 firejail /usr/bin/firefox "$@"
+    #flatpak --socket=wayland --env=MOZ_ENABLE_WAYLAND=1 --env=GDK_BACKEND=wayland run org.mozilla.firefox "$@"
 else
     firejail /usr/bin/firefox "$@"
+    #flatpak run org.mozilla.firefox "$@"
 fi
 exit "$?"
