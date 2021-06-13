@@ -1,0 +1,11 @@
+#!/bin/bash
+
+firejail --private-tmp --ignore=seccomp\
+  --whitelist=~/.local/share/Steam --noblacklist=~/.local/share/Steam\
+  --whitelist=~/.cache/mesa_shader_cache --noblacklist=~/.cache/mesa_shader_cache\
+  --whitelist=~/.steam --noblacklist=~/.steam\
+  --whitelist=~/.steampath --noblacklist=~/.steampath\
+  --whitelist=~/.steampid --noblacklist=~/.steampid\
+  /usr/bin/steam "$@"
+
+exit $?
