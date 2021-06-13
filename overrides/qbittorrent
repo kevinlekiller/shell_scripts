@@ -1,0 +1,15 @@
+#!/bin/bash
+
+tun=$(ip link | grep -o "tun[0-9]*" | head -n1)
+
+if [[ $tun == "" ]]; then
+    osd_cat --age=5 --font="-*-*-*-*-*-*-20-*-*-*-*-*-*-*" --align=center --pos=middle <<< "(qBittorrent) ERROR: Openvpn network device not found."
+    exit 1
+fi
+
+firejail --interface="$tun" --private-dev --private-tmp\
+ --whitelist=~/Downloads --whitelist=~/.config/qbittorrent --whitelist=~/Transfers\
+ --noblacklist=~/Downloads --noblacklist=~/.config/.bittorrent --noblacklist=~/Transfers\
+ /usr/bin/qbittorrent
+
+exit $?
