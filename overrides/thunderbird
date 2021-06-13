@@ -1,0 +1,8 @@
+#!/bin/bash
+
+firejail --private-dev --private-tmp\
+ --whitelist=~/Downloads --whitelist=~/.thunderbird --whitelist=~/.cache/thunderbird\
+ --noblacklist=~/Downloads --noblacklist=~/.thunderbird --noblacklist=~/.cache/thunderbird\
+ /usr/bin/thunderbird "$@"
+
+ exit $?
