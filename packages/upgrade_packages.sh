@@ -1,6 +1,6 @@
 #!/bin/bash
 
-trap catchExit SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
+trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
 function catchExit() {
     [[ -z $1 ]] && exit 0 || exit "$1"
 }
@@ -14,6 +14,8 @@ if [[ ! -t 0 ]]; then
         fi
     done
 fi
+
+cd ~ || exit
 
 if which pipx &> /dev/null; then
     echo "Upgrading pip packages"
@@ -34,6 +36,7 @@ echo "Upgrading distro packages."
 if which pmm &> /dev/null; then
     sudo pmm -Syu # Bedrock linux's package manager manager
 elif [[ -f /usr/lib/os-release ]] && which zypper &> /dev/null; then
+    sudo zypper refresh
     if grep -qi "openSUSE Leap" /usr/lib/os-release; then
         sudo zypper up
     elif grep -qi "openSUSE Tumbleweed" /usr/lib/os-release; then
