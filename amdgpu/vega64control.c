@@ -51,28 +51,36 @@ bool fanSpeedControl, pstateControl = false, silent = false;
 float interval = 1.0;
 const char * user_pp_table;
 int fanLut[99];
-FILE * gpu_busy_percent;
-FILE * power_dpm_force_performance_level;
-FILE * pp_dpm_mclk;
-FILE * pp_dpm_sclk;
-FILE * pp_dpm_socclk;
-FILE * fan1_enable;
-FILE * fan1_target;
-FILE * temp1_input;
+char power_dpm_force_performance_level[64];
+char pp_dpm_mclk[42];
+char pp_dpm_sclk[42];
+char pp_dpm_socclk[44];
+char pp_table[39];
+char gpu_busy_percent[47];
+char temp1_input[57];
+char fan1_enable[57];
+char fan1_target[57];
 char buf[256];
 char pp_table[39];
+FILE * fh;
 
-bool writeFile(FILE * fp, const char * value) {
-    if (fputs(value, fp) < 0 || fseek(fp, 0, SEEK_SET) != 0){
+bool writeFile(const char * path, const char * value) {
+    fh = fopen(path, "r+");
+    if (fputs(value, fh) < 0 || fseek(fh, 0, SEEK_SET) != 0){
+        fclose(fh);
         return false;
     }
+    fclose(fh);
     return true;
 }
 
-bool readFile(FILE * fp, size_t size) {
-    if (fseek(fp, 0, SEEK_SET) != 0 || fread(buf, 1, size, fp) < 1) {
+bool readFile(const char * path, size_t size) {
+    fh = fopen(path, "r");
+    if (fseek(fh, 0, SEEK_SET) != 0 || fread(buf, 1, size, fh) < 1) {
+        fclose(fh);
         return false;
     }
+    fclose(fh);
     return true;
 }
 
@@ -88,30 +96,6 @@ void cleanup() {
             printf("Enabling automatic P-State control.\n");
         }
         writeFile(power_dpm_force_performance_level, "auto");
-    }
-    if (gpu_busy_percent != NULL) {
-        fclose(gpu_busy_percent);
-    }
-    if (power_dpm_force_performance_level != NULL) {
-        fclose(power_dpm_force_performance_level);
-    }
-    if (pp_dpm_mclk != NULL) {
-        fclose(pp_dpm_mclk);
-    }
-    if (pp_dpm_sclk != NULL) {
-        fclose(pp_dpm_sclk);
-    }
-    if (pp_dpm_socclk != NULL) {
-        fclose(pp_dpm_socclk);
-    }
-    if (fan1_enable != NULL) {
-        fclose(fan1_enable);
-    }
-    if (fan1_target != NULL) {
-        fclose(fan1_target);
-    }
-    if (temp1_input != NULL) {
-        fclose(temp1_input);
     }
     exit(EXIT_SUCCESS);
 }
@@ -156,19 +140,21 @@ void setPstates() {
     if (atoi(buf) >= gpuLoadCheck) {
         iters = 0;
         if (socPstate < maxSocState) {
-            iters = 1;
-            socPstate++;
-            sprintf(buf, "%d", socPstate);
-            writeFile(pp_dpm_socclk, buf);
-            if (vramPstate < maxVramState) {
-                setVramPstate();
+            sprintf(buf, "%d", socPstate + 1);
+            if (writeFile(pp_dpm_socclk, buf)) {
+                iters = 1;
+                socPstate++;
+                if (vramPstate < maxVramState) {
+                    setVramPstate();
+                }
             }
         }
         if (gpuPstate < maxGpuState) {
-            iters = 1;
-            gpuPstate++;
-            sprintf(buf, "%d", gpuPstate);
-            writeFile(pp_dpm_sclk, buf);
+            sprintf(buf, "%d", gpuPstate + 1);
+            if (writeFile(pp_dpm_sclk, buf)) {
+                iters = 1;
+                gpuPstate++;
+            }
         }
         if (!silent && iters) {
             printf("\nIncreased P-States: GPU %d ; SOC %d ; VRAM %d\n", gpuPstate, socPstate, vramPstate);
@@ -310,30 +296,15 @@ bool checkFiles(char * devPath, char * hwmonPath) {
         } else if (!pstateControl) {
             break;
         } else if (strcmp(devFiles[i], "gpu_busy_percent") == 0) {
-            gpu_busy_percent = fopen(tmpPath, "r");
-            if (gpu_busy_percent == NULL) {
-                return false;
-            }
+            sprintf(gpu_busy_percent, "%s", tmpPath);
         } else if (strcmp(devFiles[i], "power_dpm_force_performance_level") == 0) {
-            power_dpm_force_performance_level = fopen(tmpPath, "r+");
-            if (power_dpm_force_performance_level == NULL) {
-                return false;
-            }
+            sprintf(power_dpm_force_performance_level, "%s", tmpPath);
         } else if (strcmp(devFiles[i], "pp_dpm_mclk") == 0) {
-            pp_dpm_mclk = fopen(tmpPath, "r+");
-            if (pp_dpm_mclk == NULL) {
-                return false;
-            }
+            sprintf(pp_dpm_mclk, "%s", tmpPath);
         } else if (strcmp(devFiles[i], "pp_dpm_sclk") == 0) {
-            pp_dpm_sclk = fopen(tmpPath, "r+");
-            if (pp_dpm_sclk == NULL) {
-                return false;
-            }
+            sprintf(pp_dpm_sclk, "%s", tmpPath);
         } else if (strcmp(devFiles[i], "pp_dpm_socclk") == 0) {
-            pp_dpm_socclk = fopen(tmpPath, "r+");
-            if (pp_dpm_socclk == NULL) {
-                return false;
-            }
+            sprintf(pp_dpm_socclk, "%s", tmpPath);
         }
     }
     if (!fanSpeedControl) {
@@ -346,20 +317,11 @@ bool checkFiles(char * devPath, char * hwmonPath) {
         if (!fileExists(tmpPath)) {
             return false;
         } else if (strcmp(hwmonFiles[i], "fan1_enable") == 0) {
-            fan1_enable = fopen(tmpPath, "r+");
-            if (fan1_enable == NULL) {
-                return false;
-            }
+            sprintf(fan1_enable, "%s", tmpPath);
         } else if (strcmp(hwmonFiles[i], "fan1_target") == 0) {
-            fan1_target = fopen(tmpPath, "r+");
-            if (fan1_target == NULL) {
-                return false;
-            }
+            sprintf(fan1_target, "%s", tmpPath);
         } else if (strcmp(hwmonFiles[i], "temp1_input") == 0) {
-            temp1_input = fopen(tmpPath, "r");
-            if (temp1_input == NULL) {
-                return false;
-            }
+            sprintf(temp1_input, "%s", tmpPath);
         }
     }
     return true;
