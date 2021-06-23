@@ -192,6 +192,7 @@ bool openFiles() {
     if (amdgpu_temp1_input == NULL) {
         return false;
     }
+    return true;
 }
 
 void mkFanLut(bool printLut) {
@@ -349,7 +350,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
         if (!openFiles()) {
-            fprintf(stderr, "ERROR: Unable to open requires files.\n");
+            fprintf(stderr, "ERROR: Unable to open required files.\n");
             return EXIT_FAILURE;
         }
         if (minFanSpeed >= lowFanSpeed) {
