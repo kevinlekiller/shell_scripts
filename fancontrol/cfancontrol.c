@@ -63,7 +63,7 @@ bool readFile(const char * path, size_t size) {
     return true;
 }
 
-unsigned char getMaxTemp() {
+int getMaxTemp() {
     int cpuTemp = 0, gpuTemp;
     if (!readFile(it8665_temp1_input, 7)) {
         return cpuTemp;
@@ -76,11 +76,11 @@ unsigned char getMaxTemp() {
     if (gpuTemp > amdgpu_temp1_input_thresh) {
         gpuTemp += amdgpu_temp1_input_offset;
     }
-    return (int) round((gpuTemp > cpuTemp ? gpuTemp : cpuTemp) / 1000.0);
+    return gpuTemp > cpuTemp ? gpuTemp : cpuTemp;
 }
 
 void setFanSpeed() {
-    int tmpSpeed, temp =  getMaxTemp();
+    int tmpSpeed, temp =  (int) round(getMaxTemp() / 1000.0);
     if (temp < lowTemp) {
         tmpSpeed = minFanSpeed;
     } else if (fanLut[temp]) {
