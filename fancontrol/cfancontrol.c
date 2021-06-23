@@ -34,23 +34,32 @@ unsigned char highFanSpeed = 0, lowFanSpeed = 0, minFanSpeed = 0, lastFanSpeed =
 bool silent = false;
 unsigned char fanLut[99];
 char buf[256];
-FILE *amdgpu_temp1_input;
-unsigned char amdgpu_temp1_input_offset = 20;
-FILE *it8665_temp1_input;
-FILE *it8665_pwm5_enable;
-FILE *it8665_pwm5;
+FILE * fh;
 
-bool writeFile(FILE * fp, const char * value) {
-    if (fputs(value, fp) < 0 || fseek(fp, 0, SEEK_SET) != 0){
+int amdgpu_temp1_input_offset = 30000;
+int amdgpu_temp1_input_thresh = 42000; // If GPU temp is above this, increment by amdgpu_temp1_input_offset
+char amdgpu_temp1_input[57];
+char it8665_temp1_input[57];
+char it8665_pwm5_enable[57];
+char it8665_pwm5[50];
+
+bool writeFile(const char * path, const char * value) {
+    fh = fopen(path, "r+");
+    if (fputs(value, fh) < 0 || fseek(fh, 0, SEEK_SET) != 0){
+        fclose(fh);
         return false;
     }
+    fclose(fh);
     return true;
 }
 
-bool readFile(FILE * fp, size_t size) {
-    if (fseek(fp, 0, SEEK_SET) != 0 || fgets(buf, size, fp) == NULL ||  fseek(fp, 0, SEEK_END) != 0) {
+bool readFile(const char * path, size_t size) {
+    fh = fopen(path, "r");
+    if (fseek(fh, 0, SEEK_SET) != 0 || fread(buf, 1, size, fh) < 1) {
+        fclose(fh);
         return false;
     }
+    fclose(fh);
     return true;
 }
 
@@ -63,7 +72,10 @@ unsigned char getMaxTemp() {
     if (!readFile(amdgpu_temp1_input, 7)) {
         return cpuTemp;
     }
-    gpuTemp = atoi(buf) + amdgpu_temp1_input_offset;
+    gpuTemp = atoi(buf);
+    if (gpuTemp > amdgpu_temp1_input_thresh) {
+        gpuTemp += amdgpu_temp1_input_offset;
+    }
     return (int) round((gpuTemp > cpuTemp ? gpuTemp : cpuTemp) / 1000.0);
 }
 
@@ -99,19 +111,7 @@ void setFanSpeed() {
 }
 
 void cleanup() {
-    if (it8665_pwm5 != NULL) {
-        writeFile(it8665_pwm5_enable, "0");
-        fclose(it8665_pwm5_enable);
-    }
-    if (it8665_pwm5 != NULL) {
-        fclose(it8665_pwm5);
-    }
-    if (it8665_temp1_input != NULL) {
-        fclose(it8665_temp1_input);
-    }
-    if (amdgpu_temp1_input != NULL) {
-        fclose(amdgpu_temp1_input);
-    }
+    //writeFile(it8665_pwm5_enable, "0");
     exit(EXIT_SUCCESS);
 }
 
@@ -131,13 +131,11 @@ bool getHwmonPath(char * name) {
         return foundPath;
     }
     struct dirent *files;
-    FILE * file;
     char buf2[30];
     while ((files = readdir(dir)) != NULL) {
         if (strstr(files->d_name, "hwmon")) {
             sprintf(buf2, "%s/%s/name", "/sys/class/hwmon", files->d_name);
-            file = fopen(buf2, "r");
-            if (file == NULL || !readFile(file, 50) || strstr(buf, name) == NULL) {
+            if (!readFile(buf2, 50) || strstr(buf, name) == NULL) {
                 continue;
             }
             sprintf(buf, "%s/%s", "/sys/class/hwmon", files->d_name);
@@ -156,40 +154,27 @@ bool openFiles() {
     if (!getHwmonPath("it8665")) {
         return false;
     }
-    char tmpPath[64];
-    sprintf(tmpPath, "%s/temp1_input", buf);
-    if (!fileExists(tmpPath)) {
+    sprintf(it8665_temp1_input, "%s/temp1_input", buf);
+    if (!fileExists(it8665_temp1_input)) {
+        fprintf(stderr, "File not found: %s\n", it8665_temp1_input);
         return false;
     }
-    it8665_temp1_input = fopen(tmpPath, "r");
-    if (it8665_temp1_input == NULL) {
+    sprintf(it8665_pwm5_enable, "%s/pwm5_enable", buf);
+    if (!fileExists(it8665_pwm5_enable)) {
+        fprintf(stderr, "File not found: %s\n", it8665_pwm5_enable);
         return false;
     }
-    sprintf(tmpPath, "%s/pwm5_enable", buf);
-    if (!fileExists(tmpPath)) {
-        return false;
-    }
-    it8665_pwm5_enable = fopen(tmpPath, "r+");
-    if (it8665_pwm5_enable == NULL) {
-        return false;
-    }
-    sprintf(tmpPath, "%s/pwm5", buf);
-    if (!fileExists(tmpPath)) {
-        return false;
-    }
-    it8665_pwm5 = fopen(tmpPath, "r+");
-    if (it8665_pwm5 == NULL) {
+    sprintf(it8665_pwm5, "%s/pwm5", buf);
+    if (!fileExists(it8665_pwm5)) {
+        fprintf(stderr, "File not found: %s\n", it8665_pwm5);
         return false;
     }
     if (!getHwmonPath("amdgpu")) {
         return false;
     }
-    sprintf(tmpPath, "%s/temp1_input", buf);
-    if (!fileExists(tmpPath)) {
-        return false;
-    }
-    amdgpu_temp1_input = fopen(tmpPath, "r");
-    if (amdgpu_temp1_input == NULL) {
+    sprintf(amdgpu_temp1_input, "%s/temp1_input", buf);
+    if (!fileExists(amdgpu_temp1_input)) {
+        fprintf(stderr, "File not found: %s\n", amdgpu_temp1_input);
         return false;
     }
     return true;
@@ -369,9 +354,12 @@ int main(int argc, char **argv) {
         if (printLut) {
             return EXIT_SUCCESS;
         }
-        writeFile(it8665_pwm5_enable, "1");
-        if (!silent) {
-            printf("Manual fan control enabled.\n");
+        readFile(it8665_pwm5_enable, 3);
+        if (atoi(buf) != 1) {
+            writeFile(it8665_pwm5_enable, "1");
+            if (!silent) {
+                printf("Manual fan control enabled.\n");
+            }
         }
     }
     while (1) {
