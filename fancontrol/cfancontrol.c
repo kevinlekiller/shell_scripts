@@ -206,6 +206,16 @@ void mkFanLut(bool printLut) {
     }
 }
 
+void enableFan() {
+    readFile(it8665_pwm5_enable, 3);
+    if (atoi(buf) != 1) {
+        writeFile(it8665_pwm5_enable, "1");
+        if (!silent) {
+            printf("Manual fan control enabled.\n");
+        }
+    }
+}
+
 void printUsage() {
     printf("Program for controling PWM chassis fans on Linux.\n");
     printf("Options:\n");
@@ -354,15 +364,13 @@ int main(int argc, char **argv) {
         if (printLut) {
             return EXIT_SUCCESS;
         }
-        readFile(it8665_pwm5_enable, 3);
-        if (atoi(buf) != 1) {
-            writeFile(it8665_pwm5_enable, "1");
-            if (!silent) {
-                printf("Manual fan control enabled.\n");
-            }
-        }
     }
+    int i = 120;
     while (1) {
+        if (120 == i++) {
+            enableFan();
+            i = 0;
+        }
         setFanSpeed();
         sleep(interval);
     }
