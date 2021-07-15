@@ -1,7 +1,9 @@
 #!/bin/bash
 
 if [[ $XDG_SESSION_TYPE == x11 ]]; then
-    MOZ_X11_EGL=1 firejail /usr/bin/firefox "$@"
+    # https://bugzilla.mozilla.org/show_bug.cgi?id=1711039
+    #MOZ_X11_EGL=1 firejail /usr/bin/firefox "$@"
+    firejail /usr/bin/firefox "$@"
     #flatpak --env=MOZ_X11_EGL=1 run org.mozilla.firefox "$@"
 elif [[ $XDG_SESSION_TYPE == wayland ]]; then
     GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 firejail /usr/bin/firefox "$@"
