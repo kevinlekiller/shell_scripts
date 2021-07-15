@@ -34,7 +34,9 @@ else
     fi
 fi
 
-if [[ -f uname && $(cat uname) != $(uname -r) ]]; then
+if [[ ! -f uname ]]; then
+    updit87=1
+elif [[ $(cat uname) != $(uname -r) ]]; then
     updit87=1
 fi
 
@@ -64,3 +66,4 @@ if [[ ! -f /etc/modprobe.d/99-it87.conf ]]; then
 fi
 
 sudo modprobe it87 ignore_resource_conflict=1
+sudo systemctl restart cfancontrol
