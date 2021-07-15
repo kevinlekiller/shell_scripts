@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd ~/.biglybt/biglybt
-firejail --private-dev --private-tmp --whitelist=~/.swt --whitelist=~/Downloads --whitelist=~/.biglybt --whitelist=~/Transfers --noblacklist=~/.swt --noblacklist=~/Downloads --noblacklist=~/.biglybt --noblacklist=~/Transfers ./biglybt
+GTK_THEME=Adwaita:dark firejail --private-dev --private-tmp --whitelist=~/.swt --whitelist=~/Downloads --whitelist=~/.biglybt --whitelist=~/Transfers --noblacklist=~/.swt --noblacklist=~/Downloads --noblacklist=~/.biglybt --noblacklist=~/Transfers ./biglybt
