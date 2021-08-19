@@ -33,6 +33,7 @@
 */
 
 #include <dirent.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <math.h>
 #include <signal.h>
@@ -62,25 +63,26 @@ char fan1_enable[57];
 char fan1_target[57];
 char buf[256];
 char pp_table[39];
-FILE * fh;
+int fd;
 
 bool writeFile(const char * path, const char * value) {
-    fh = fopen(path, "r+");
-    if (fputs(value, fh) < 0 || fseek(fh, 0, SEEK_SET) != 0){
-        fclose(fh);
+    ssize_t size = strlen(value);
+    fd = open(path, O_RDWR);
+    if (fd < 0 || write(fd, value, size) != size) {
+        close(fd);
         return false;
     }
-    fclose(fh);
+    close(fd);
     return true;
 }
 
-bool readFile(const char * path, size_t size) {
-    fh = fopen(path, "r");
-    if (fseek(fh, 0, SEEK_SET) != 0 || fread(buf, 1, size, fh) < 1) {
-        fclose(fh);
+bool readFile(const char * path, ssize_t size) {
+    fd = open(path, O_RDONLY);
+    if (fd < 0 || read(fd, buf, size) < 1) {
+        close(fd);
         return false;
     }
-    fclose(fh);
+    close(fd);
     return true;
 }
 
