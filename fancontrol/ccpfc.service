@@ -3,7 +3,7 @@ Description=Controls the fanspeed of the chassis fans using the Corsair Commande
 After=local-fs.target
 
 [Service]
-ExecStart=/usr/local/bin/ccpfc --fan-smooth-up=20 --fan-smooth-down=1 --fan-speed-min=0 --fan-speed-low=45 --fan-temp-low=50 --fan-speed-high=255 --fan-temp-high=77 --interval=3.0 --silent --niceness=19 --fans="pwm1:0;pwm2:0;pwm3:0;pwm4:0;pwm5:0" --temp-sensors="k10temp:temp1_input:0:0;amdgpu:temp1_input:20000:42000"
+ExecStart=/usr/local/bin/ccpfc --fan-smooth-up=20 --fan-smooth-down=1 --fan-speed-min=0 --fan-speed-low=45 --fan-temp-low=50 --fan-speed-high=255 --fan-temp-high=77 --interval=3.0 --silent --niceness=19 --fans="pwm1:0;pwm2:0;pwm3:0;pwm4:0;pwm5:0" --temp-sensors="k10temp:temp1_input:0:0;amdgpu:temp1_input:20:42"
 Type=simple
 Restart=always
 RestartSec=5
