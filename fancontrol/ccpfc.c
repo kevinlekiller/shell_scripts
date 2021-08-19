@@ -86,7 +86,7 @@ int getMaxTemp() {
         if (!readFile(tsenArr[i].path, 7)) {
             continue;
         }
-        senTemp = atoi(buf);
+        senTemp = (int) round(atof(buf) / 1000.0);
         if (senTemp > tsenArr[i].thres) {
             senTemp += tsenArr[i].offs;
         }
@@ -101,7 +101,7 @@ int getMaxTemp() {
 }
 
 void setFanSpeed() {
-    int tmpSpeed, fanSpeed, temp =  (int) round(getMaxTemp() / 1000.0);
+    int tmpSpeed, fanSpeed, temp = getMaxTemp();
     if (temp < lowTemp) {
         tmpSpeed = minFanSpeed;
     } else if (fanLut[temp]) {
@@ -242,10 +242,10 @@ void printUsage() {
     printf("   Must be in this format: --temp-sensors=DEVICE_NAME:SENSOR_NAME:OFFSET:THRES;DEVICE_NAME:SENSOR_NAME:OFFSET:THRES\n");
     printf("   DEVICE_NAME is from the hwmon name file. Get all possible values with: cat /sys/class/hwmon/hwmon*/name\n");
     printf("   SENSOR_NAME is the file name of the temp sensor. Get a list of all files: ls /sys/class/hwmon/hwmon*/temp*_input\n");
-    printf("   OFFSET If for example the sensor reads 34500 (34.5C), we can apply a 10000 offset so the program thinks it's 44.5C.\n");
+    printf("   OFFSET If for example the sensor reads 34C, we can apply a 10C offset so the program thinks it's 44C.\n");
     printf("   THRES Only applies the OFFSET if the sensor is above THRES.\n");
     printf("    This is useful if you have a GPU and want the case fans to spin faster if the GPU is hot and the CPU is cool.\n");
-    printf("   Example: --temp-sensors=\"k10temp:temp1_input:0:0;amdgpu:temp1_input:20000:42000\"\n");
+    printf("   Example: --temp-sensors=\"k10temp:temp1_input:0:0;amdgpu:temp1_input:20:42\"\n");
 }
 
 int main(int argc, char **argv) {
