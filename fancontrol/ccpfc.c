@@ -173,7 +173,7 @@ bool getHwmonPath(char * name) {
     }
     closedir(dir);
     if (!foundPath) {
-        fprintf(stderr, "ERROR: Could not find hwmon directory.\n");
+        fprintf(stderr, "ERROR: Could not find hwmon directory. '%s'\n", foundPath);
     }
     return foundPath;
 }
@@ -236,7 +236,7 @@ void printUsage() {
     printf("   Must be in this format: --fans=PWM:OFFSET\n");
     printf("   PWM is the file name of fan to control. Get a list of all files: ls /sys/bus/hid/drivers/corsair-cpro/[0-9]*/hwmon/hwmon*/pwm* | grep -o pwm[0-6]\n");
     printf("   OFFSET can be a positive or negative number to apply to the fan's PWM, (valid -128 to 128).\n");
-    printf("   Example: --fans=pwm1:0;pwm2:5;pwm3:-10\n");
+    printf("   Example: --fans=\"pwm1:0;pwm2:5;pwm3:-10\"\n");
     printf(" -t, --temp-sensors=\n");
     printf("   List of hwmon temperature sensors.\n");
     printf("   Must be in this format: --temp-sensors=DEVICE_NAME:SENSOR_NAME:OFFSET:THRES;DEVICE_NAME:SENSOR_NAME:OFFSET:THRES\n");
