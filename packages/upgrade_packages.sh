@@ -30,6 +30,7 @@ fi
 if which flatpak &> /dev/null; then
     echo "Upgrading Flatpak packages."
     sudo flatpak upgrade && sudo flatpak uninstall --unused
+    flatpak --user upgrade && flatpak --user uninstall --unused
     echo "Done upgrading Flatpak packages."
 fi
 echo "Upgrading distro packages."
@@ -53,7 +54,7 @@ elif which dnf &> /dev/null; then
 elif which yum &> /dev/null; then
     sudo yum check-update && sudo yum update
 elif which emerge &> /dev/null; then
-    sudo emerge --sync && sudo emerge --update --deep --with-bdeps=y @world
+    sudo emerge --sync && sudo emerge --verbose --update --deep --changed-use @world
 fi
 echo "Done upgrading distro packages."
 if which journalctl &> /dev/null; then
