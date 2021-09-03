@@ -50,7 +50,7 @@ elif which pacman &> /dev/null; then
 elif which apt &> /dev/null; then
     sudo apt update && sudo apt upgrade
 elif which dnf &> /dev/null; then
-    sudo dnf upgrade && sudo dns autoremove
+    sudo dnf upgrade && sudo dnf autoremove
 elif which yum &> /dev/null; then
     sudo yum check-update && sudo yum update
 elif which emerge &> /dev/null; then
