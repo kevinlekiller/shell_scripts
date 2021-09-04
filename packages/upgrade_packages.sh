@@ -33,6 +33,11 @@ if which flatpak &> /dev/null; then
     flatpak --user upgrade && flatpak --user uninstall --unused
     echo "Done upgrading Flatpak packages."
 fi
+if which snap &> /dev/null; then
+    echo "Upgrading Snap packages."
+    sudo snap refresh
+    echo "Done upgrading Snap packages."
+fi
 echo "Upgrading distro packages."
 if which pmm &> /dev/null; then
     sudo pmm -Syu # Bedrock linux's package manager manager
