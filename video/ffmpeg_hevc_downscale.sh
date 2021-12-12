@@ -2,17 +2,17 @@
 
 cat > /dev/null <<LICENSE
     Copyright (C) 2021  kevinlekiller
-    
+
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
     as published by the Free Software Foundation; either version 2
     of the License, or (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-    
+
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -150,7 +150,9 @@ for inFile in **; do
         echoCol "Skipping file \"$inFile\". Matched on \"$SKIPFILEMATCH\"." "blue"
         continue
     fi
-    ouFile=$(echo "$inFile" | sed -E "s/ (360|480|540|720|1080|2160)[pр]//" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
+    # Remove resolution from filename, add new resolution / codec name.
+    ouFile=$(echo "$inFile" | sed -E "s/[\._ ](360|480|540|720|1080|2160)[pр]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
+    # If both the input and output files are still the same name, append _.
     if [[ "$inFile" == "$ouFile" ]]; then
         ouFile="${ouFile}_"
     fi
@@ -167,6 +169,13 @@ for inFile in **; do
     if [[ -f $BITRATELOG ]] && grep -Fxq "$inFile" "$BITRATELOG"; then
         echoCol "Bitrate too low: \"$inFile\". Skipping." "blue"
         continue
+    fi
+    # Create output and parent directoties if they don't exist.
+    if [[ ! -f $ouFile ]]; then
+        mkdir -p "$ouFile"
+        if [[ -d "$ouFile" ]]; then
+            rmdir "$ouFile"
+        fi
     fi
     details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=height,codec_name,r_frame_rate "$inFile" 2>&1)
     if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
@@ -240,6 +249,10 @@ for inFile in **; do
             if [[ $DETECTEDINTERLACE == 0 ]] || [[ $DETECTEDINTERLACE == 1 && $DEINTERLACEDELETE == 1 ]]; then
                 echoCol "Deleting input file \"$inFile\"." "blue"
                 rm "$inFile"
+                # Check if inFile folder is empty and delete if so.
+                if [[ ! $(ls -A "$(dirname "$inFile")" ]]; then
+                    rmdir "$(dirname "$inFile")"
+                fi
             fi
         elif [[ -n $SKIPFILELOG ]]; then
             echo "$inFile" >> "$SKIPFILELOG"
