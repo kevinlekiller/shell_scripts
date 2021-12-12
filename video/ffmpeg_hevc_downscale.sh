@@ -151,7 +151,7 @@ for inFile in **; do
         continue
     fi
     # Remove resolution from filename, add new resolution / codec name.
-    ouFile=$(echo "$inFile" | sed -E "s/[\._ ](360|480|540|720|1080|2160)[pр]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
+    ouFile=$(echo "$inFile" | sed -E "s/[^0-9](360|480|540|720|1080|2160)[pр]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
     # If both the input and output files are still the same name, append _.
     if [[ "$inFile" == "$ouFile" ]]; then
         ouFile="${ouFile}_"
