@@ -173,7 +173,7 @@ for inFile in **; do
     # Create output and parent directoties if they don't exist.
     if [[ ! -f $ouFile ]]; then
         mkdir -p "$ouFile"
-        if [[ -d "$ouFile" ]]; then
+        if [[ -d $ouFile ]]; then
             rmdir "$ouFile"
         fi
     fi
@@ -250,7 +250,7 @@ for inFile in **; do
                 echoCol "Deleting input file \"$inFile\"." "blue"
                 rm "$inFile"
                 # Check if inFile folder is empty and delete if so.
-                if [[ ! $(ls -A "$(dirname "$inFile")" ]]; then
+                if [[ ! $(ls -A "$(dirname "$inFile")") ]]; then
                     rmdir "$(dirname "$inFile")"
                 fi
             fi
