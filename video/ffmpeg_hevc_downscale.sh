@@ -128,8 +128,9 @@ function checkDeinterlace {
 echoColors=$(tput colors 2> /dev/null)
 [[ -n $echoColors && $echoColors -ge 8 ]] && echoColors=1 || echoColors=0
 function echoCol {
+    curTime=$(date +'%Y %b %d %H:%M:%S')
     if [[ $echoColors != 1 ]]; then
-        echo "$1"
+        echo "[$curTime] $1"
         return
     fi
     case $2 in
@@ -138,7 +139,7 @@ function echoCol {
         brown) echo -ne "\e[33m";;
         blue) echo -ne "\e[34m";;
     esac
-    echo -e "$1\e[0m"
+    echo -e "[$curTime] $1\e[0m"
 }
 
 shopt -s globstar
@@ -151,7 +152,7 @@ for inFile in **; do
         continue
     fi
     # Remove resolution from filename, add new resolution / codec name.
-    ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9](360|480|540|720|1080|2160)[pр]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
+    ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9](360|480|540|720|1080|2160)[pрP]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
     # If both the input and output files are still the same name, append _.
     if [[ "$inFile" == "$ouFile" ]]; then
         ouFile="${ouFile}_"
