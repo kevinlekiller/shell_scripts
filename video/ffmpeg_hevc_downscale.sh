@@ -74,7 +74,7 @@ if [[ ! -d $1 ]]; then
     exit 1
 fi
 
-trap catchExit SIGHUP SIGINT SIGQUIT SIGFPE SIGTERM
+trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
 function catchExit() {
     exit 0
 }
@@ -189,7 +189,7 @@ for inFile in **; do
         fi
         continue
     fi
-    height=$(echo "$details" | grep -Po "height=\d+" | cut -d= -f2)
+    height=$(echo "$details" | grep -m1 -Po "height=\d+" | cut -d= -f2)
     if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
         echoCol "Resolution of input video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
         if [[ -n $LOWLOG ]]; then
@@ -198,8 +198,8 @@ for inFile in **; do
         continue
     fi
     if [[ $MINBITRATE -gt 1 ]]; then
-        bitRate=$(echo "$details" | grep -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
-        frameRate=$(echo "$details" | grep -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
+        bitRate=$(echo "$details" | grep -m1 -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
+        frameRate=$(echo "$details" | grep -m1 -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
         minBitRate=$(bc -l <<< \(\("$frameRate"\)/30\)*"$MINBITRATE")
         minBitRate=${minBitRate%.*}
         if [[ $bitRate =~ ^[0-9]*$ ]] && [[ $frameRate =~ ^[0-9]*\/[0-9]*$ ]] && [[ $bitRate -lt $minBitRate ]]; then
