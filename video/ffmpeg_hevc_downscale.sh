@@ -68,6 +68,10 @@ DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 # For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
 # Set to 0 to disable
 SIZECHECK=${SIZECHECK:-5}
+# Check the file's extension against a (case insensitive) regex.
+# If the file does not match this regex it will be skipped.
+# Set to "" to disable.
+EXTREGEX=${EXTREGEX:-"\.(3gp|3g2|avi|flv|m2t|m4v|mov|mp4|mpg|mpeg|mkv|vob|webm|wmv)$"}
 
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
@@ -142,9 +146,13 @@ function echoCol {
     echo -e "[$curTime] $1\e[0m"
 }
 
-shopt -s globstar
+shopt -s globstar nocasematch
 for inFile in **; do
     if [[ ! -f $inFile ]]; then
+        continue
+    fi
+    if [[ $EXTREGEX != "" ]] && [[ ! $inFile =~ ${EXTREGEX} ]]; then
+        echoCol "Skipping file \"$inFile\". Does not match EXTREGEX." "blue"
         continue
     fi
     if [[ $inFile =~ $SKIPFILEMATCH ]]; then
