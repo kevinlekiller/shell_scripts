@@ -65,7 +65,7 @@ FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 80k -vbr on -compression 10 -ac 2}
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
 # Checks if video is interlaced and deinterlaces it.
 # Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
-FFMPEGVFD=${FFMPEGVFD:--vf scale=-2:$OUTHEIGHT:flags=lanczos,estdif}
+FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
 # Log of files that have been deinterlaced.
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
