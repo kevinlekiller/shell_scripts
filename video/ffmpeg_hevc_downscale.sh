@@ -45,20 +45,27 @@ FFMPEGNICE=${FFMPEGNICE:-19}
 # Set the amount of threads used by ffmpeg. Setting to 0, ffmpeg will automatically use the optimal amount of threads.
 FFMPEGTHREADS=${FFMPEGTHREADS:-0}
 # lixb265 CRF value ; ffmpeg default is 28, lower number results in higher image quality
-FFMPEGCRF=${FFMPEGCRF:-19}
+FFMPEGCRF=${FFMPEGCRF:-21}
 # libx265 preset value ; ffmpeg default is medium ; see x265 manual for valid values
 FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
 # You can limit the amount of threads x265 uses with the pools parameter
 # For example -x265-params log-level=error:aq-mode=3:pools=2
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=3}
-# vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
-FFMPEGVF=${FFMPEGVF:-scale=-2:$OUTHEIGHT:flags=lanczos}
+# -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
+FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
+# -c:v options
+FFMPEGCV=${FFMPEGCV:--c:v libx265}
+# -c:s options, set to copy to avoid re-encoding.
+# srt assures compatibility with matroska.
+FFMPEGCS=${FFMPEGCS:--c:s srt}
+# -c:a options, set to copy to avoid re-encoding.
+FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 80k -vbr on -compression 10 -ac 2}
 # Log converted files to this file:
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
 # Checks if video is interlaced and deinterlaces it.
 # Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
-DEINTERLACE=${DEINTERLACE:-estdif}
+FFMPEGVFD=${FFMPEGVFD:--vf scale=-2:$OUTHEIGHT:flags=lanczos,estdif}
 # Log of files that have been deinterlaced.
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
@@ -111,18 +118,14 @@ fi
 cd "$1" || exit
 
 function checkDeinterlace {
-    if [[ -z $DEINTERLACE ]]; then
+    if [[ -z $FFMPEGVFD ]]; then
         return
     fi
     idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,1100),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f null - -i "$inFile" 2>&1)"
     for frameType in "Single" "Multi"; do
         for frameOrder in "TFF" "BFF"; do
             if [[ $(echo "$idetData" | grep -Po "$frameType frame detection:.*" | grep -Po "$frameOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
-                if [[ -n $VFTEMP ]]; then
-                    VFTEMP="$VFTEMP,$DEINTERLACE"
-                else
-                    VFTEMP="$DEINTERLACE"
-                fi
+                VFTEMP=$FFMPEGVFD
                 return
             fi
         done
@@ -219,7 +222,7 @@ for inFile in **; do
         fi
         echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
     fi
-    VFTEMP="$FFMPEGVF"
+    VFTEMP=$FFMPEGVF
     DETECTEDINTERLACE=0
     checkDeinterlace
     START=$(date +%s)
@@ -231,9 +234,11 @@ for inFile in **; do
         -nostdin -loglevel error \
         -stats -hide_banner -y \
         -i "$inFile" \
-        -vf "$VFTEMP" \
-        -c:d copy -c:s copy -c:a copy \
-        -c:v libx265 \
+        $VFTEMP \
+        -c:d copy \
+        $FFMPEGCS \
+        $FFMPEGCA \
+        $FFMPEGCV \
         $FFMPEGEXTRA \
         -preset "$FFMPEGPRESET" \
         -crf "$FFMPEGCRF" \
