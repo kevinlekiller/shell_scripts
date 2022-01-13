@@ -51,7 +51,7 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
 # You can limit the amount of threads x265 uses with the pools parameter
 # For example -x265-params log-level=error:aq-mode=3:pools=2
-FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=3}
+FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=2}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
 # -c:v options
@@ -69,7 +69,7 @@ FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
 # Log of files that have been deinterlaced.
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
-DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
+DEINTERLACEDELETE=${DEINTERLACEDELETE:-1}
 # The new file must be at least this percentage smaller than the original file.
 # Deletes the new file and add the original file to SKIPFILELOG
 # For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
@@ -125,6 +125,7 @@ function checkDeinterlace {
     for frameType in "Single" "Multi"; do
         for frameOrder in "TFF" "BFF"; do
             if [[ $(echo "$idetData" | grep -Po "$frameType frame detection:.*" | grep -Po "$frameOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
+                INTERLACED=1
                 VFTEMP=$FFMPEGVFD
                 return
             fi
@@ -224,9 +225,10 @@ for inFile in **; do
         echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
     fi
     VFTEMP=$FFMPEGVF
+    INTERLACED=0
     checkDeinterlace
     START=$(date +%s)
-    echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $VFTEMP != $FFMPEGVFD ]]; then echo " not"; fi) interlaced." "brown"
+    echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
     ffmpegCmd=(
         nice -n $FFMPEGNICE
         ffmpeg -nostdin -loglevel error -stats -hide_banner -y
@@ -260,7 +262,7 @@ for inFile in **; do
             echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
         fi
         if [[ $DELINFIL -eq 1 ]]; then
-            if [[ $DETECTEDINTERLACE == 0 ]] || [[ $DETECTEDINTERLACE == 1 && $DEINTERLACEDELETE == 1 ]]; then
+            if [[ $INTERLACED == 0 ]] || [[ $INTERLACED == 1 && $DEINTERLACEDELETE == 1 ]]; then
                 echoCol "Deleting input file \"$inFile\"." "blue"
                 rm "$inFile"
                 # Check if inFile folder is empty and delete if so.
@@ -274,7 +276,7 @@ for inFile in **; do
         if [[ -n $SKIPFILELOG ]]; then
             echo "$ouFile" >> "$SKIPFILELOG"
         fi
-        if [[ $DETECTEDINTERLACE == 1 && -n $DEINTERLACELOG ]]; then
+        if [[ $INTERLACED == 1 && -n $DEINTERLACELOG ]]; then
             if [[ $DEINTERLACEDELETE == 1 ]]; then
                 echo "$ouFile" >> "$DEINTERLACELOG"
             else
