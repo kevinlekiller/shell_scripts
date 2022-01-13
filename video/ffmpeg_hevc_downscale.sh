@@ -69,7 +69,7 @@ FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
 # Log of files that have been deinterlaced.
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
-DEINTERLACEDELETE=${DEINTERLACEDELETE:-1}
+DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 # The new file must be at least this percentage smaller than the original file.
 # Deletes the new file and add the original file to SKIPFILELOG
 # For example if this is set to 5, the original file is 1000MiB, the new file will be deleted if it's 950MiB or bigger.
@@ -121,15 +121,16 @@ function checkDeinterlace {
     if [[ -z $FFMPEGVFD ]]; then
         return
     fi
-    idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,1100),setpts=PTS-STARTPTS",idet -frames:v 200 -an -f null - -i "$inFile" 2>&1)"
+    idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,1300),setpts=PTS-STARTPTS",idet -frames:v 400 -an -f null - -i "$inFile" 2>&1)"
     for frameType in "Single" "Multi"; do
-        for frameOrder in "TFF" "BFF"; do
-            if [[ $(echo "$idetData" | grep -Po "$frameType frame detection:.*" | grep -Po "$frameOrder:\s*\d+" | grep -o "[0-9]*") -gt 0 ]]; then
-                INTERLACED=1
-                VFTEMP=$FFMPEGVFD
-                return
-            fi
-        done
+        NTFF=$(echo "$idetData" | grep -Poi "$frameType frame detection:\s*TFF:\s*\d+" | grep -Po "\d+")
+        NBFF=$(echo "$idetData" | grep -Poi "$frameType frame detection:.+?BFF:\s*\d+" | grep -Po "BFF:\s*\d+" | grep -Po "\d+")
+        NPROG=$(echo "$idetData" | grep -Poi "$frameType frame detection:.+?Progressive:\s*\d+" | grep -Po "Progressive:\s*\d+" | grep -Po "\d+")
+        if [[ $((NTFF+NBFF)) -gt $NPROG ]]; then
+            INTERLACED=1
+            VFTEMP=$FFMPEGVFD
+            return
+        fi
     done
 }
 
