@@ -60,7 +60,7 @@ FFMPEGCV=${FFMPEGCV:--c:v libx265}
 # srt assures compatibility with matroska.
 FFMPEGCS=${FFMPEGCS:--c:s srt}
 # -c:a options, set to copy to avoid re-encoding.
-FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 80k -vbr on -compression 10 -ac 2}
+FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 64k -vbr on -compression 10 -frame_duration 60 -ac 2}
 # Log converted files to this file:
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
 # Checks if video is interlaced and deinterlaces it.
@@ -189,7 +189,7 @@ for inFile in **; do
             rmdir "$ouFile"
         fi
     fi
-    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=height,codec_name,r_frame_rate "$inFile" 2>&1)
+    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
     if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
         echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
         if [[ -n $SKIPFILELOG ]]; then
@@ -201,6 +201,7 @@ for inFile in **; do
         continue
     fi
     height=$(echo "$details" | grep -m1 -Po "height=\d+" | cut -d= -f2)
+    width=$(echo "$details" | grep -m1 -Po "width=\d+" | cut -d= -f2)
     if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
         echoCol "Resolution of input video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
         if [[ -n $LOWLOG ]]; then
@@ -223,27 +224,26 @@ for inFile in **; do
         echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
     fi
     VFTEMP=$FFMPEGVF
-    DETECTEDINTERLACE=0
     checkDeinterlace
     START=$(date +%s)
-    echoCol "Converting \"$inFile\" to \"$ouFile\". File $(echo "$details" | grep -Po "Duration: [\d:.]+")" "brown"
-    if [[ $DETECTEDINTERLACE == 1 ]]; then
-        echoCol "Video has been detected to be interlaced." "brown"
-    fi
-    nice -n $FFMPEGNICE ffmpeg \
-        -nostdin -loglevel error \
-        -stats -hide_banner -y \
-        -i "$inFile" \
-        $VFTEMP \
-        -c:d copy \
-        $FFMPEGCS \
-        $FFMPEGCA \
-        $FFMPEGCV \
-        $FFMPEGEXTRA \
-        -preset "$FFMPEGPRESET" \
-        -crf "$FFMPEGCRF" \
-        -threads "$FFMPEGTHREADS" \
+    echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $VFTEMP != $FFMPEGVFD ]]; then echo " not"; fi) interlaced." "brown"
+    ffmpegCmd=(
+        nice -n $FFMPEGNICE
+        ffmpeg -nostdin -loglevel error -stats -hide_banner -y
+        -i "$inFile"
+        $VFTEMP
+        -c:d copy
+        $FFMPEGCS
+        $FFMPEGCA
+        $FFMPEGCV
+        $FFMPEGEXTRA
+        -preset $FFMPEGPRESET
+        -crf $FFMPEGCRF
+        -threads $FFMPEGTHREADS
         "$ouFile"
+    )
+    echoCol "$(echo "${ffmpegCmd[@]}" | xargs)" "brown"
+    "${ffmpegCmd[@]}"
     if [[ $? == 0 ]]; then
         ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
         origSize=$(stat --format=%s "$inFile")
