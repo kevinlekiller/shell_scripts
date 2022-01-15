@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cat > /dev/null <<LICENSE
-    Copyright (C) 2021  kevinlekiller
+    Copyright (C) 2021-2022  kevinlekiller
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -66,6 +66,13 @@ CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
 # Checks if video is interlaced and deinterlaces it.
 # Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
 FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
+# Set the amount of video frames to check for interlacing.
+# More frames increases accuracy, but takes longer to process.
+DEINTERLACEFRAMES=${DEINTERLACEFRAMES:-600}
+# Set the threshold percentage to enable interlacing.
+# For example, if set to 40, then if 33% of the frames are interlaced, the
+# deinterlacing vf filter will be enabled.
+DEINTERLACETHRES=${DEINTERLACETHRES:-40}
 # Log of files that have been deinterlaced.
 DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
@@ -114,19 +121,25 @@ fi
 if [[ $SIZECHECK -gt 100 ]]; then
     SIZECHECK=100
 fi
+if [[ $DEINTERLACETHRES -gt 100 ]] || [[ $DEINTERLACETHRES -lt 1 ]]; then
+    DEINTERLACETHRES=40
+fi
+if [[ $DEINTERLACEFRAMES -lt 100 ]]; then
+    DEINTERLACETHRES=100
+fi
 
 cd "$1" || exit
 
+DEINTERLACETHRES=$(bc -l <<< $DEINTERLACEFRAMES*0.$DEINTERLACETHRES | cut -d. -f1)
 function checkDeinterlace {
     if [[ -z $FFMPEGVFD ]]; then
         return
     fi
-    idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,1300),setpts=PTS-STARTPTS",idet -frames:v 400 -an -f null - -i "$inFile" 2>&1)"
+    idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,$((900+$DEINTERLACEFRAMES))),setpts=PTS-STARTPTS",idet -frames:v $DEINTERLACEFRAMES -an -f null - -i "$inFile" 2>&1)"
     for frameType in "Single" "Multi"; do
         NTFF=$(echo "$idetData" | grep -Poi "$frameType frame detection:\s*TFF:\s*\d+" | grep -Po "\d+")
         NBFF=$(echo "$idetData" | grep -Poi "$frameType frame detection:.+?BFF:\s*\d+" | grep -Po "BFF:\s*\d+" | grep -Po "\d+")
-        NPROG=$(echo "$idetData" | grep -Poi "$frameType frame detection:.+?Progressive:\s*\d+" | grep -Po "Progressive:\s*\d+" | grep -Po "\d+")
-        if [[ $((NTFF+NBFF)) -gt $NPROG ]]; then
+        if [[ $((NTFF+NBFF)) -ge $DEINTERLACETHRES ]]; then
             INTERLACED=1
             VFTEMP=$FFMPEGVFD
             return
