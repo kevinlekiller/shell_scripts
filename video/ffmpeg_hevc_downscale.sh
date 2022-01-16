@@ -19,10 +19,14 @@ cat > /dev/null <<LICENSE
     https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 LICENSE
 
-# Simple script to downscale all videos in specified directory to be re-encoded to HEVC using ffmpeg.
+# Simple script to downscale all videos in specified directory (recursively) to be re-encoded to HEVC using ffmpeg.
+# If you add more videos to the directory while the script is running, they will also be processed.
 
 # Delete input file after conversion is done. Set to 1 to enable.
 DELINFIL=${DELINFIL:-1}
+# File extension to use on the output file.
+# Affects which container ffmpeg will use.
+OUTPUTEXTENSION=${OUTPUTEXTENSION:-mkv}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
 # Minimun allowed bitrate of input video @30fps
@@ -165,140 +169,150 @@ function echoCol {
 }
 
 shopt -s globstar nocasematch
-for inFile in **; do
-    if [[ ! -f $inFile ]]; then
-        continue
-    fi
-    if [[ $EXTREGEX != "" ]] && [[ ! $inFile =~ ${EXTREGEX} ]]; then
-        echoCol "Skipping file \"$inFile\". Does not match EXTREGEX." "blue"
-        continue
-    fi
-    if [[ $inFile =~ $SKIPFILEMATCH ]]; then
-        echoCol "Skipping file \"$inFile\". Matched on \"$SKIPFILEMATCH\"." "blue"
-        continue
-    fi
-    # Remove resolution from filename, add new resolution / codec name.
-    ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9](360|480|540|720|1080|2160)[pрP]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.mkv/")
-    # If both the input and output files are still the same name, append _.
-    if [[ "$inFile" == "$ouFile" ]]; then
-        ouFile="${ouFile}_"
-    fi
-    if [[ -f $SKIPFILELOG ]]; then
-        if grep -Fxq  "$ouFile" "$SKIPFILELOG" || grep -Fxq "$inFile" "$SKIPFILELOG"; then
-            echoCol "Already converted \"$inFile\". Skipping." "blue"
+while true; do
+    filesProcessed=0
+    for inFile in **; do
+        if [[ ! -f $inFile ]]; then
             continue
         fi
-    fi
-    if [[ -f $LOWLOG ]] && grep -Fxq  "$inFile" "$LOWLOG"; then
-        echoCol "Resolution too low: \"$inFile\". Skipping." "blue"
-        continue
-    fi
-    if [[ -f $BITRATELOG ]] && grep -Fxq "$inFile" "$BITRATELOG"; then
-        echoCol "Bitrate too low: \"$inFile\". Skipping." "blue"
-        continue
-    fi
-    # Create output and parent directoties if they don't exist.
-    if [[ ! -f $ouFile ]]; then
-        mkdir -p "$ouFile"
-        if [[ -d $ouFile ]]; then
-            rmdir "$ouFile"
+        if [[ $EXTREGEX != "" ]] && [[ ! $inFile =~ ${EXTREGEX} ]]; then
+            echoCol "Skipping file \"$inFile\". Does not match EXTREGEX." "blue"
+            continue
         fi
-    fi
-    details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
-    if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
-        echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
-        if [[ -n $SKIPFILELOG ]]; then
-            if [[ ! $ouFile =~ "HEVC 720p HEVC" ]]; then
+        if [[ $inFile =~ $SKIPFILEMATCH ]]; then
+            echoCol "Skipping file \"$inFile\". Matched on \"$SKIPFILEMATCH\"." "blue"
+            continue
+        fi
+        # Remove resolution from filename, add new resolution / codec name.
+        ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9](360|480|540|720|1080|2160)[pрP]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.$OUTPUTEXTENSION/")
+        # If both the input and output files are still the same name, append _.
+        if [[ "$inFile" == "$ouFile" ]]; then
+            ouFile="$(echo "$ouFile" | sed "s/\.$OUTPUTEXTENSION$/_.$OUTPUTEXTENSION/")"
+        fi
+        if [[ -f $SKIPFILELOG ]]; then
+            if grep -Fxq  "$ouFile" "$SKIPFILELOG" || grep -Fxq "$inFile" "$SKIPFILELOG"; then
+                echoCol "Already converted \"$inFile\". Skipping." "blue"
+                continue
+            fi
+        fi
+        if [[ -f $LOWLOG ]] && grep -Fxq  "$inFile" "$LOWLOG"; then
+            echoCol "Resolution too low: \"$inFile\". Skipping." "blue"
+            continue
+        fi
+        if [[ -f $BITRATELOG ]] && grep -Fxq "$inFile" "$BITRATELOG"; then
+            echoCol "Bitrate too low: \"$inFile\". Skipping." "blue"
+            continue
+        fi
+        # Create output and parent directoties if they don't exist.
+        if [[ ! -f $ouFile ]]; then
+            mkdir -p "$ouFile"
+            if [[ -d $ouFile ]]; then
+                rmdir "$ouFile"
+            fi
+        fi
+        details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
+        if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
+            echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
+            if [[ -n $SKIPFILELOG ]]; then
+                if [[ ! $ouFile =~ "HEVC 720p HEVC" ]]; then
+                    echo "$ouFile" >> "$SKIPFILELOG"
+                fi
+                echo "$inFile" >> "$SKIPFILELOG"
+            fi
+            continue
+        fi
+        height=$(echo "$details" | grep -m1 -Po "height=\d+" | cut -d= -f2)
+        width=$(echo "$details" | grep -m1 -Po "width=\d+" | cut -d= -f2)
+        if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
+            echoCol "Resolution of input video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
+            if [[ -n $LOWLOG ]]; then
+                echo "$inFile" >> "$LOWLOG"
+            fi
+            continue
+        fi
+        if [[ $MINBITRATE -gt 1 ]]; then
+            bitRate=$(echo "$details" | grep -m1 -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
+            frameRate=$(echo "$details" | grep -m1 -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
+            minBitRate=$(bc -l <<< \(\("$frameRate"\)/30\)*"$MINBITRATE")
+            minBitRate=${minBitRate%.*}
+            if [[ $bitRate =~ ^[0-9]*$ ]] && [[ $frameRate =~ ^[0-9]*\/[0-9]*$ ]] && [[ $bitRate -lt $minBitRate ]]; then
+                echoCol "Bitrate of input video is too low, bitrate is $bitRate, minimum is $minBitRate. Skipping. \"$inFile\"" "blue"
+                if [[ -n $BITRATELOG ]]; then
+                    echo "$inFile" >> "$BITRATELOG"
+                fi
+                continue
+            fi
+            echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
+        fi
+        VFTEMP=$FFMPEGVF
+        INTERLACED=0
+        checkDeinterlace
+        START=$(date +%s)
+        echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
+        ffmpegCmd=(
+            nice -n $FFMPEGNICE
+            ffmpeg -nostdin -loglevel error -stats -hide_banner -y
+            -i "$inFile"
+            $VFTEMP
+            -c:d copy
+            $FFMPEGCS
+            $FFMPEGCA
+            $FFMPEGCV
+            $FFMPEGEXTRA
+            -preset $FFMPEGPRESET
+            -crf $FFMPEGCRF
+            -threads $FFMPEGTHREADS
+            "$ouFile"
+        )
+        echoCol "$(echo "${ffmpegCmd[@]}" | xargs)" "brown"
+        "${ffmpegCmd[@]}"
+        if [[ $? == 0 ]]; then
+            ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
+            origSize=$(stat --format=%s "$inFile")
+            endSize=$(stat --format=%s "$ouFile")
+            echoCol "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB." "green"
+            maxSize=$((origSize-origSize*SIZECHECK/100))
+            if [[ $SIZECHECK != 0 ]] && [[ $endSize -ge $maxSize ]]; then
+                echoCol "New file exceeds size check threshold ($SIZECHECK% -> $((maxSize/1024/1024))MiB). Deleting new file." "red"
+                rm "$ouFile"
+                echo "$inFile" >> "$SKIPFILELOG"
+                continue
+            fi
+            if [[ -n $CONVERSIONLOG ]]; then
+                echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
+            fi
+            if [[ $DELINFIL -eq 1 ]]; then
+                if [[ $INTERLACED == 0 ]] || [[ $INTERLACED == 1 && $DEINTERLACEDELETE == 1 ]]; then
+                    echoCol "Deleting input file \"$inFile\"." "blue"
+                    rm "$inFile"
+                    # Check if inFile folder is empty and delete if so.
+                    if [[ ! $(ls -A "$(dirname "$inFile")") ]]; then
+                        rmdir "$(dirname "$inFile")"
+                    fi
+                fi
+            elif [[ -n $SKIPFILELOG ]]; then
+                echo "$inFile" >> "$SKIPFILELOG"
+            fi
+            if [[ -n $SKIPFILELOG ]]; then
                 echo "$ouFile" >> "$SKIPFILELOG"
             fi
-            echo "$inFile" >> "$SKIPFILELOG"
-        fi
-        continue
-    fi
-    height=$(echo "$details" | grep -m1 -Po "height=\d+" | cut -d= -f2)
-    width=$(echo "$details" | grep -m1 -Po "width=\d+" | cut -d= -f2)
-    if [[ $height == "" ]] || [[ $height -le $MININHEIGHT ]]; then
-        echoCol "Resolution of input video is too low: height is $height, minimum is $MININHEIGHT. Skipping. \"$inFile\"" "blue"
-        if [[ -n $LOWLOG ]]; then
-            echo "$inFile" >> "$LOWLOG"
-        fi
-        continue
-    fi
-    if [[ $MINBITRATE -gt 1 ]]; then
-        bitRate=$(echo "$details" | grep -m1 -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
-        frameRate=$(echo "$details" | grep -m1 -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
-        minBitRate=$(bc -l <<< \(\("$frameRate"\)/30\)*"$MINBITRATE")
-        minBitRate=${minBitRate%.*}
-        if [[ $bitRate =~ ^[0-9]*$ ]] && [[ $frameRate =~ ^[0-9]*\/[0-9]*$ ]] && [[ $bitRate -lt $minBitRate ]]; then
-            echoCol "Bitrate of input video is too low, bitrate is $bitRate, minimum is $minBitRate. Skipping. \"$inFile\"" "blue"
-            if [[ -n $BITRATELOG ]]; then
-                echo "$inFile" >> "$BITRATELOG"
-            fi
-            continue
-        fi
-        echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
-    fi
-    VFTEMP=$FFMPEGVF
-    INTERLACED=0
-    checkDeinterlace
-    START=$(date +%s)
-    echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
-    ffmpegCmd=(
-        nice -n $FFMPEGNICE
-        ffmpeg -nostdin -loglevel error -stats -hide_banner -y
-        -i "$inFile"
-        $VFTEMP
-        -c:d copy
-        $FFMPEGCS
-        $FFMPEGCA
-        $FFMPEGCV
-        $FFMPEGEXTRA
-        -preset $FFMPEGPRESET
-        -crf $FFMPEGCRF
-        -threads $FFMPEGTHREADS
-        "$ouFile"
-    )
-    echoCol "$(echo "${ffmpegCmd[@]}" | xargs)" "brown"
-    "${ffmpegCmd[@]}"
-    if [[ $? == 0 ]]; then
-        ENDT=$(date -d@$(($(date +%s) - START)) -u +%Hh:%Mm:%Ss)
-        origSize=$(stat --format=%s "$inFile")
-        endSize=$(stat --format=%s "$ouFile")
-        echoCol "Finished converting in $ENDT. Orignal size: $((origSize/1024/1024))MiB, new size: $((endSize/1024/1024))MiB." "green"
-        maxSize=$((origSize-origSize*SIZECHECK/100))
-        if [[ $SIZECHECK != 0 ]] && [[ $endSize -ge $maxSize ]]; then
-            echoCol "New file exceeds size check threshold ($SIZECHECK% -> $((maxSize/1024/1024))MiB). Deleting new file." "red"
-            rm "$ouFile"
-            echo "$inFile" >> "$SKIPFILELOG"
-            continue
-        fi
-        if [[ -n $CONVERSIONLOG ]]; then
-            echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
-        fi
-        if [[ $DELINFIL -eq 1 ]]; then
-            if [[ $INTERLACED == 0 ]] || [[ $INTERLACED == 1 && $DEINTERLACEDELETE == 1 ]]; then
-                echoCol "Deleting input file \"$inFile\"." "blue"
-                rm "$inFile"
-                # Check if inFile folder is empty and delete if so.
-                if [[ ! $(ls -A "$(dirname "$inFile")") ]]; then
-                    rmdir "$(dirname "$inFile")"
+            if [[ $INTERLACED == 1 && -n $DEINTERLACELOG ]]; then
+                if [[ $DEINTERLACEDELETE == 1 ]]; then
+                    echo "$ouFile" >> "$DEINTERLACELOG"
+                else
+                    echo "$inFile  ->  $ouFile" >> "$DEINTERLACELOG"
                 fi
             fi
-        elif [[ -n $SKIPFILELOG ]]; then
-            echo "$inFile" >> "$SKIPFILELOG"
+            ((++filesProcessed))
+        else
+            rm -f "$ouFile"
+            echoCol "Failed to convert video \"$inFile\"." "red"
         fi
-        if [[ -n $SKIPFILELOG ]]; then
-            echo "$ouFile" >> "$SKIPFILELOG"
-        fi
-        if [[ $INTERLACED == 1 && -n $DEINTERLACELOG ]]; then
-            if [[ $DEINTERLACEDELETE == 1 ]]; then
-                echo "$ouFile" >> "$DEINTERLACELOG"
-            else
-                echo "$inFile  ->  $ouFile" >> "$DEINTERLACELOG"
-            fi
-        fi
-    else
-        rm -f "$ouFile"
-        echoCol "Failed to convert video \"$inFile\"." "red"
+    done
+    if [[ $filesProcessed == 0 ]]; then
+        break
     fi
+    echoCol "Processed $filesProcessed files." "green"
+    echoCol "Sleeping 5 seconds to check for new files." "green"
+    sleep 5
 done
