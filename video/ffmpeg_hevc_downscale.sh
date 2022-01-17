@@ -58,10 +58,10 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=2}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
-# Change -aspect to DAR (display aspect ratio) if SAR (sample aspect ratio) DAR are different, and scales video to proper aspect ratio.
-# For example, a Bluray with 1440x1080 and a SAR of 4:3 and a DAR of 16:9 will be scaled to 1280x720 and the SAR / DAR set to 16:9.
-# If the option is set empty, then the video will retain its original SAR / DAR and scale, using the above example
-# of 1440x1080 SAR 4:3 DAR 16:9, the output video will be scaled to 960x720 and SAR 4:3 DAR 16:9.
+# Change -aspect to DAR (display aspect ratio) if SAR (sample aspect ratio) DAR are different, and scales video to DAR aspect ratio.
+# For example, a Bluray with 1440x1080, a SAR of 4:3 and a DAR of 16:9 will be scaled to 1280x720 and the DAR set to 16:9.
+# If the option is set empty, the video will retain the original SAR & DAR and scale ; using the above example
+# of 1440x1080, SAR 4:3 and DAR 16:9,the output video will be scaled to 960x720 and DAR will remain 16:9.
 ASPECTCHANGE=${ASPECTCHANGE:-1}
 # -c:v options
 FFMPEGCV=${FFMPEGCV:--c:v libx265}
