@@ -29,21 +29,21 @@ DELINFIL=${DELINFIL:-1}
 OUTPUTEXTENSION=${OUTPUTEXTENSION:-mkv}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
+# Desired height of the output video in pixels.
+OUTHEIGHT=${OUTHEIGHT:-720}
 # Minimun allowed bitrate of input video @30fps
 # If the video is 60fps for example, then this value is doubled.
 # Set to 1 to disable.
 MINBITRATE=${MINBITRATE:-3000}
 # If a file is too low res, log it here, it will be skipped on the next run.
-BITRATELOG=${BITRATELOG:-~/.config/ffmpeg_downscale.bitrate}
+BITRATELOG=${BITRATELOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.bitrate}
 # Minimun input video height in pixels to convert video.
 MININHEIGHT=${MININHEIGHT:-800}
 # If a file is too low res, log it here, it will be skipped on the next run.
-LOWLOG=${LOWLOG:-~/.config/ffmpeg_downscale.low}
-# Desired height of the output video in pixels.
-OUTHEIGHT=${OUTHEIGHT:-720}
+LOWLOG=${LOWLOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.low}
 # File to store paths to files that have been already converted to
 # speed up conversion if script has already been run.
-SKIPFILELOG=${SKIPFILELOG:-~/.config/ffmpeg_downscale.done}
+SKIPFILELOG=${SKIPFILELOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.done}
 # Niceness to set ffmpeg to, 19 is lowest priority.
 FFMPEGNICE=${FFMPEGNICE:-19}
 # Set the amount of threads used by ffmpeg. Setting to 0, ffmpeg will automatically use the optimal amount of threads.
@@ -66,7 +66,7 @@ FFMPEGCS=${FFMPEGCS:--c:s srt}
 # -c:a options, set to copy to avoid re-encoding.
 FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 64k -vbr on -compression 10 -frame_duration 60 -ac 2}
 # Log converted files to this file:
-CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale.tsv}
+CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.tsv}
 # Checks if video is interlaced and deinterlaces it.
 # Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
 FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
@@ -78,7 +78,7 @@ DEINTERLACEFRAMES=${DEINTERLACEFRAMES:-600}
 # deinterlacing vf filter will be enabled.
 DEINTERLACETHRES=${DEINTERLACETHRES:-40}
 # Log of files that have been deinterlaced.
-DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale.deint}
+DEINTERLACELOG=${DEINTERLACELOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.deint}
 # (If DELINFIL is enabled) Delete input files after deinterlacing. Set to 1 to enable.
 DEINTERLACEDELETE=${DEINTERLACEDELETE:-0}
 # The new file must be at least this percentage smaller than the original file.
@@ -89,7 +89,7 @@ SIZECHECK=${SIZECHECK:-5}
 # Check the file's extension against a (case insensitive) regex.
 # If the file does not match this regex it will be skipped.
 # Set to "" to disable.
-EXTREGEX=${EXTREGEX:-"\.(3gp|3g2|avi|flv|m2t|m4v|mov|mp4|mpg|mpeg|mkv|vob|webm|wmv)$"}
+EXTREGEX=${EXTREGEX:-"\.(3gp|3g2|avi|flv|m2t|m2ts|m4v|mov|mp4|mpg|mpeg|mkv|vob|webm|wmv)$"}
 
 if [[ ! -d $1 ]]; then
     echo "Supply folder as first argument."
@@ -98,6 +98,9 @@ fi
 
 trap catchExit SIGHUP SIGINT SIGQUIT SIGTERM
 function catchExit() {
+    if [[ $success == 0 && -f $ouFile ]]; then
+        rm -f "$ouFile"
+    fi
     exit 0
 }
 
@@ -184,7 +187,8 @@ while true; do
             continue
         fi
         # Remove resolution from filename, add new resolution / codec name.
-        ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9](360|480|540|720|1080|2160)[pрP]//g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.$OUTPUTEXTENSION/")
+        ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9][0-9]{3,4}[pрP]([^A-Za-z0-9])/\1/g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.$OUTPUTEXTENSION/" | sed -E "s/ +/ /g")
+        success=0
         # If both the input and output files are still the same name, append _.
         if [[ "$inFile" == "$ouFile" ]]; then
             ouFile="$(echo "$ouFile" | sed "s/\.$OUTPUTEXTENSION$/_.$OUTPUTEXTENSION/")"
@@ -210,7 +214,7 @@ while true; do
                 rmdir "$ouFile"
             fi
         fi
-        details=$(ffprobe -hide_banner -select_streams v:0  -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
+        details=$(ffprobe -hide_banner -select_streams v:0 -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
         if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
             echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
             if [[ -n $SKIPFILELOG ]]; then
@@ -278,6 +282,7 @@ while true; do
                 echo "$inFile" >> "$SKIPFILELOG"
                 continue
             fi
+            success=1
             if [[ -n $CONVERSIONLOG ]]; then
                 echo -e "[$(date)]\t$inFile\t$origSize\t$ouFile\t$endSize\t$ENDT" >> "$CONVERSIONLOG"
             fi
