@@ -263,7 +263,6 @@ while true; do
         VFTEMP=$FFMPEGVF
         INTERLACED=0
         checkDeinterlace
-        # Video with SAR 4:3 and DAR 16:9
         SAR=$(echo "$details" | grep -Po "SAR \d+:\d+" | cut -d\  -f2)
         DAR=$(echo "$details" | grep -Po "DAR \d+:\d+" | cut -d\  -f2)
         if [[ $ASPECTCHANGE == 1 && $SAR != $DAR && $SAR =~ ^[0-9]+:[0-9]+$ && $DAR =~ ^[0-9]+:[0-9]+$ ]]; then
