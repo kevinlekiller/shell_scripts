@@ -73,7 +73,7 @@ FFMPEGCA=${FFMPEGCA:--c:a libopus -b:a 64k -vbr on -compression 10 -frame_durati
 # Log converted files to this file:
 CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.tsv}
 # Checks if video is interlaced and deinterlaces it.
-# Set the vf filter to pass to ffmpeg to enable. Set empty to disable.
+# Set the vf filter to pass to ffmpeg to enable. Set empty to disable deinterlacing.
 FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
 # Set the amount of video frames to check for interlacing.
 # More frames increases accuracy, but takes longer to process.
@@ -109,20 +109,50 @@ function catchExit() {
     exit 0
 }
 
+echoColors=$(tput colors 2> /dev/null)
+[[ -n $echoColors && $echoColors -ge 8 ]] && echoColors=1 || echoColors=0
+function echoCol {
+    curTime=$(date +'%Y %b %d %H:%M:%S')
+    if [[ $echoColors != 1 ]]; then
+        echo "[$curTime] $1"
+        return
+    fi
+    case $2 in
+        red) echo -ne "\e[31m";;
+        green) echo -ne "\e[32m";;
+        brown) echo -ne "\e[33m";;
+        blue) echo -ne "\e[34m";;
+    esac
+    echo -e "[$curTime] $1\e[0m"
+}
+
 if [[ ! $FFMPEGTHREADS =~ ^[0-9]+$ ]] || [[ $FFMPEGTHREADS -lt 0 ]]; then
-    FFMPEGTHREADS=0
+    echoCol "Error: FFMPEGTHREADS must be a number at minimum 0." red
+    exit 1
 fi
 if [[ ! $FFMPEGNICE =~ ^[0-9]+$ ]] || [[ $FFMPEGNICE -gt 19 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
-    FFMPEGNICE=19
+    echoCol "Error: FFMPEGNICE must be a number between 0 and 19." red
+    exit 1
 fi
 if [[ ! $MINBITRATE =~ ^[0-9]+$ ]] || [[ $MINBITRATE -lt 1 ]]; then
-    MINBITRATE=3000
+    echoCol "Error: MINBITRATE must be a number at minimum 1." red
+    exit 1
 fi
 if [[ ! $MININHEIGHT =~ ^[0-9]+$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
-    MININHEIGHT=800
+    echoCol "Error: MININHEIGHT must be a number at minimum 1." red
+    exit 1
 fi
-if [[ ! $OUTHEIGHT =~ ^[0-9]+$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
-    OUTHEIGHT=720
+if [[ ! $OUTHEIGHT =~ ^[0-9]*[02468]$ ]] || [[ $OUTHEIGHT -lt 2 ]]; then
+    echoCol "Error: OUTHEIGHT must be a number divisible by 2 and at minimum 2." red
+    exit 1
+fi
+if [[ $DEINTERLACETHRES -gt 100 || $DEINTERLACETHRES -lt 1 ]]; then
+    echoCol "Error: DEINTERLACETHRES must be a number from 1 to 100." red
+    exit 1
+fi
+if [[ $DEINTERLACEFRAMES -lt 1 ]]; then
+    echoCol "Error: DEINTERLACEFRAMES must be at minimum 1." red
+    exit 1
 fi
 if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
     echo -e "Time\tInput File\tInput File Size\tOutput File\tOutput File Size\tConversion time" > "$CONVERSIONLOG"
@@ -132,12 +162,6 @@ if [[ ! $SIZECHECK =~ ^[0-9]+$ ]] || [[ $SIZECHECK -lt 1 ]]; then
 fi
 if [[ $SIZECHECK -gt 100 ]]; then
     SIZECHECK=100
-fi
-if [[ $DEINTERLACETHRES -gt 100 ]] || [[ $DEINTERLACETHRES -lt 1 ]]; then
-    DEINTERLACETHRES=40
-fi
-if [[ $DEINTERLACEFRAMES -lt 100 ]]; then
-    DEINTERLACETHRES=100
 fi
 
 cd "$1" || exit
@@ -157,23 +181,6 @@ function checkDeinterlace {
             return
         fi
     done
-}
-
-echoColors=$(tput colors 2> /dev/null)
-[[ -n $echoColors && $echoColors -ge 8 ]] && echoColors=1 || echoColors=0
-function echoCol {
-    curTime=$(date +'%Y %b %d %H:%M:%S')
-    if [[ $echoColors != 1 ]]; then
-        echo "[$curTime] $1"
-        return
-    fi
-    case $2 in
-        red) echo -ne "\e[31m";;
-        green) echo -ne "\e[32m";;
-        brown) echo -ne "\e[33m";;
-        blue) echo -ne "\e[34m";;
-    esac
-    echo -e "[$curTime] $1\e[0m"
 }
 
 shopt -s globstar nocasematch
@@ -259,14 +266,20 @@ while true; do
         # Video with SAR 4:3 and DAR 16:9
         SAR=$(echo "$details" | grep -Po "SAR \d+:\d+" | cut -d\  -f2)
         DAR=$(echo "$details" | grep -Po "DAR \d+:\d+" | cut -d\  -f2)
-        if [[ $ASPECTCHANGE == 1 && $SAR != $DAR && $SAR =~ ^[0-9]+:[0-9]+$ && $SAR != "1:1" && $DAR =~ ^[0-9]+:[0-9]+$ ]]; then
+        if [[ $ASPECTCHANGE == 1 && $SAR != $DAR && $SAR =~ ^[0-9]+:[0-9]+$ && $DAR =~ ^[0-9]+:[0-9]+$ ]]; then
             LDAR=$(echo "$DAR" | cut -d\: -f1)
             RDAR=$(echo "$DAR" | cut -d\: -f2)
-            oWidth=$(bc -l <<< $OUTHEIGHT/$RDAR*$LDAR | cut -d\. -f1)
+            oWidth=$(bc -l <<< "($OUTHEIGHT/$RDAR*$LDAR)+0.5" | cut -d\. -f1)
             if [[ $oWidth =~ [0-9]+ ]]; then
+                # libx265 needs a number divisible by 2.
+                if [[ $oWidth =~ [13579]$ ]]; then
+                    ((--oWidth))
+                fi
                 VFTEMP="$(echo "$VFTEMP" | sed -E "s/-?[0-9]+:$OUTHEIGHT/$oWidth:$OUTHEIGHT/") -aspect $DAR"
             fi
         fi
+        [[ $SAR == "" ]] && SAR="N/A"
+        [[ $DAR == "" ]] && DAR="N/A"
         START=$(date +%s)
         echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} (SAR: $SAR | DAR: $DAR) ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
         ffmpegCmd=(
