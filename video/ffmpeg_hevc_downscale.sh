@@ -58,6 +58,11 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=2}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
+# Change -aspect to DAR (display aspect ratio) if SAR (sample aspect ratio) DAR are different, and scales video to proper aspect ratio.
+# For example, a Bluray with 1440x1080 and a SAR of 4:3 and a DAR of 16:9 will be scaled to 1280x720 and the SAR / DAR set to 16:9.
+# If the option is set empty, then the video will retain its original SAR / DAR and scale, using the above example
+# of 1440x1080 SAR 4:3 DAR 16:9, the output video will be scaled to 960x720 and SAR 4:3 DAR 16:9.
+ASPECTCHANGE=${ASPECTCHANGE:-1}
 # -c:v options
 FFMPEGCV=${FFMPEGCV:--c:v libx265}
 # -c:s options, set to copy to avoid re-encoding.
@@ -104,25 +109,25 @@ function catchExit() {
     exit 0
 }
 
-if [[ ! $FFMPEGTHREADS =~ ^[0-9]*$ ]] || [[ $FFMPEGTHREADS -lt 0 ]]; then
+if [[ ! $FFMPEGTHREADS =~ ^[0-9]+$ ]] || [[ $FFMPEGTHREADS -lt 0 ]]; then
     FFMPEGTHREADS=0
 fi
-if [[ ! $FFMPEGNICE =~ ^[0-9]*$ ]] || [[ $FFMPEGNICE -gt 19 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
+if [[ ! $FFMPEGNICE =~ ^[0-9]+$ ]] || [[ $FFMPEGNICE -gt 19 ]] || [[ $FFMPEGNICE -lt 0 ]]; then
     FFMPEGNICE=19
 fi
-if [[ ! $MINBITRATE =~ ^[0-9]*$ ]] || [[ $MINBITRATE -lt 1 ]]; then
+if [[ ! $MINBITRATE =~ ^[0-9]+$ ]] || [[ $MINBITRATE -lt 1 ]]; then
     MINBITRATE=3000
 fi
-if [[ ! $MININHEIGHT =~ ^[0-9]*$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
+if [[ ! $MININHEIGHT =~ ^[0-9]+$ ]] || [[ $MININHEIGHT -lt 1 ]]; then
     MININHEIGHT=800
 fi
-if [[ ! $OUTHEIGHT =~ ^[0-9]*$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
+if [[ ! $OUTHEIGHT =~ ^[0-9]+$ ]] || [[ $OUTHEIGHT -lt 1 ]]; then
     OUTHEIGHT=720
 fi
 if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
     echo -e "Time\tInput File\tInput File Size\tOutput File\tOutput File Size\tConversion time" > "$CONVERSIONLOG"
 fi
-if [[ ! $SIZECHECK =~ ^[0-9]*$ ]] || [[ $SIZECHECK -lt 1 ]]; then
+if [[ ! $SIZECHECK =~ ^[0-9]+$ ]] || [[ $SIZECHECK -lt 1 ]]; then
     SIZECHECK=0
 fi
 if [[ $SIZECHECK -gt 100 ]]; then
@@ -251,8 +256,19 @@ while true; do
         VFTEMP=$FFMPEGVF
         INTERLACED=0
         checkDeinterlace
+        # Video with SAR 4:3 and DAR 16:9
+        SAR=$(echo "$details" | grep -Po "SAR \d+:\d+" | cut -d\  -f2)
+        DAR=$(echo "$details" | grep -Po "DAR \d+:\d+" | cut -d\  -f2)
+        if [[ $ASPECTCHANGE == 1 && $SAR != $DAR && $SAR =~ ^[0-9]+:[0-9]+$ && $SAR != "1:1" && $DAR =~ ^[0-9]+:[0-9]+$ ]]; then
+            LDAR=$(echo "$DAR" | cut -d\: -f1)
+            RDAR=$(echo "$DAR" | cut -d\: -f2)
+            oWidth=$(bc -l <<< $OUTHEIGHT/$RDAR*$LDAR | cut -d\. -f1)
+            if [[ $oWidth =~ [0-9]+ ]]; then
+                VFTEMP="$(echo "$VFTEMP" | sed -E "s/-?[0-9]+:$OUTHEIGHT/$oWidth:$OUTHEIGHT/") -aspect $DAR"
+            fi
+        fi
         START=$(date +%s)
-        echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
+        echoCol "Converting \"$inFile\" to \"$ouFile\". $(echo "$details" | grep -Po "Duration: [\d:.]+") ; Resolution: ${width}x${height} (SAR: $SAR | DAR: $DAR) ; Video is$(if [[ $INTERLACED == 0 ]]; then echo " not"; fi) interlaced." "brown"
         ffmpegCmd=(
             nice -n $FFMPEGNICE
             ffmpeg -nostdin -loglevel error -stats -hide_banner -y
