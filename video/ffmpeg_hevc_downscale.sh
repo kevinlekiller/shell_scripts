@@ -55,13 +55,13 @@ FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
 # You can limit the amount of threads x265 uses with the pools parameter
 # For example -x265-params log-level=error:aq-mode=3:pools=2
-FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:aq-mode=2}
+FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
-# Change -aspect to DAR (display aspect ratio) if SAR (sample aspect ratio) DAR are different, and scales video to DAR aspect ratio.
-# For example, a Bluray with 1440x1080, a SAR of 4:3 and a DAR of 16:9 will be scaled to 1280x720 and the DAR set to 16:9.
-# If the option is set empty, the video will retain the original SAR & DAR and scale ; using the above example
-# of 1440x1080, SAR 4:3 and DAR 16:9,the output video will be scaled to 960x720 and DAR will remain 16:9.
+# Scales the video to DAR (display aspect ratio) if SAR (sample aspect ratio) and DAR are different.
+# For example, with OUTHEIGHT at 720, a 1440x1080 Bluray with an SAR of 4:3 and a DAR of 16:9 will be scaled to 1280x720.
+# If the option is set empty, the video will retain the original SAR ; using the above example
+# of 1440x1080, SAR 4:3 and DAR 16:9,the output video will be scaled to 960x720.
 ASPECTCHANGE=${ASPECTCHANGE:-1}
 # -c:v options
 FFMPEGCV=${FFMPEGCV:--c:v libx265}
