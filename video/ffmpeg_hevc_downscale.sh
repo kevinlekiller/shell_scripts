@@ -166,7 +166,7 @@ fi
 
 cd "$1" || exit
 
-DEINTERLACETHRES=$(bc -l <<< $DEINTERLACEFRAMES*0.$DEINTERLACETHRES | cut -d. -f1)
+DEINTERLACETHRES=$(bc -l <<< "($DEINTERLACEFRAMES*0.$DEINTERLACETHRES)+0.5" | cut -d\. -f1)
 function checkDeinterlace {
     if [[ -z $FFMPEGVFD ]]; then
         return
@@ -249,8 +249,7 @@ while true; do
         if [[ $MINBITRATE -gt 1 ]]; then
             bitRate=$(echo "$details" | grep -m1 -Po "Duration: .*? bitrate: \d+" | grep -o "bitrate: [0-9]*" | cut -d\  -f2)
             frameRate=$(echo "$details" | grep -m1 -Po "r_frame_rate=[\d/]+" | cut -d= -f2)
-            minBitRate=$(bc -l <<< \(\("$frameRate"\)/30\)*"$MINBITRATE")
-            minBitRate=${minBitRate%.*}
+            minBitRate=$(bc -l <<< "((($frameRate)/30)*$MINBITRATE)+0.5" | cut -d\. -f1)
             if [[ $bitRate =~ ^[0-9]*$ ]] && [[ $frameRate =~ ^[0-9]*\/[0-9]*$ ]] && [[ $bitRate -lt $minBitRate ]]; then
                 echoCol "Bitrate of input video is too low, bitrate is $bitRate, minimum is $minBitRate. Skipping. \"$inFile\"" "blue"
                 if [[ -n $BITRATELOG ]]; then
