@@ -16,7 +16,7 @@
  */
 
 /**
- * Chassis & CPU fan control using CORSAIR Commander Pro / k10temp (CPU temp sensor) / amdgpu (GPU temp sensor)
+ * Chassis & CPU fan control using CORSAIR Commander Pro
  *
  * Compile: gcc ccpfc.c -o ccpfc -Wextra -O2 -lm
  * Run : ./ccpfc --help
