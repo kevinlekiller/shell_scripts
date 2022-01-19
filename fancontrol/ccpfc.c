@@ -437,6 +437,10 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        if (argc <= 1 || curFans <= 0 || curTsen <= 0) {
+            printUsage();
+            return EXIT_FAILURE;
+        }
         if (geteuid() != 0) {
             fprintf(stderr, "ERROR: ccpfc must be run as root.\n");
             return EXIT_FAILURE;
