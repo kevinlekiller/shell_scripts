@@ -33,7 +33,7 @@ FANS=${FANS:-[123456]}
 # Show the temp to speed lookup table then exit. Leave empty to disable. eg.: SHOWLUT=1 ./fanspeed.sh
 SHOWLUT=${SHOWLUT:-}
 
-# Delay between checking temps / setting fan speed.
+# Delay (in seconds) between checking temps / setting fan speed.
 INTERVAL=${INTERVAL:-2.0}
 
 # If this is enabled, lower RPM by at most this much each $INTERVAL, to smooth out the fan speed.
