@@ -47,7 +47,7 @@ SMOOTHASCENT=${SMOOTHASCENT:-50}
 MINSPEED=0
 
 # What fan speed to set at what temperature, for example set the fans to 400 RPM when the temp is 50c, shut off the fans when the temp is 35c or less.
-# All other values are calculated on the fly, pass the SHOWMAP=true environment variable to show the calculated values.
+# All other values are calculated on the fly, pass the SHOWLUT=true environment variable to show the calculated values.
 TEMP[0]=35
 SPEED[0]=0
 
