@@ -142,6 +142,6 @@ while true; do
         fi
     fi
     LSPEED=$CSPEED
-    echo $CPSEED | tee /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target > /dev/null
+    echo $CSPEED | tee /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target > /dev/null
     sleep "$INTERVAL"
 done
