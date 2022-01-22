@@ -143,7 +143,9 @@ while true; do
         fi
     fi
     LSPEED=$CSPEED
-    echo $CSPEED > /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target
+    for file in /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target; do
+        echo $CSPEED > "$file"
+    done
 
     sleep "$INTERVAL"
 done
