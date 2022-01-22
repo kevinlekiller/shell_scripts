@@ -95,7 +95,6 @@ if [[ $EUID != 0 ]]; then
     exit 1
 fi
 
-
 TEMPSENSOR=$(realpath $TEMPSENSOR)
 if [[ ! -f $TEMPSENSOR ]] || [[ ! $(cat $TEMPSENSOR) =~ ^[0-9]+$ ]]; then
     echo "ERROR: Unable to find temperature sensor '$TEMPSENSOR'."
@@ -143,9 +142,6 @@ while true; do
         fi
     fi
     LSPEED=$CSPEED
-    for file in /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target; do
-        echo $CSPEED > "$file"
-    done
-
+    echo $CPSEED | tee /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_target > /dev/null
     sleep "$INTERVAL"
 done
