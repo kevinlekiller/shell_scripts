@@ -40,10 +40,10 @@ INTERVAL=${INTERVAL:-2.0}
 # Can be disabled with 0, max value is 500.
 SMOOTHDESCENT=${SMOOTHDESCENT:-50}
 
-# Similar to SMOOTHDESCENT, but for when the fan PWM goes up.
+# Similar to SMOOTHDESCENT, but for when the fan RPM goes up.
 SMOOTHASCENT=${SMOOTHASCENT:-50}
 
-# Set to this fan PWM when temperature is lower than TEMP[0].
+# Set to this fan RPM when temperature is lower than TEMP[0].
 MINSPEED=0
 
 # What fan speed to set at what temperature, for example set the fans to 400 RPM when the temp is 50c, shut off the fans when the temp is 35c or less.
