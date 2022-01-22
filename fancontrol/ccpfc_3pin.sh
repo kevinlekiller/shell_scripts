@@ -24,7 +24,7 @@ LICENSE
 # Temperature sensor to monitor.
 # Find sensors with : for file in $(find /sys/devices -name temp[[0-9]*_input); do echo "$(cat "$(dirname "$file")/name") -> $file"; done
 # The hwmon[NUMBER] folder changes on reboot, so set it to hwmon[0-9]*
-TEMPSENSOR=${TEMPSENSOR:-/sys/devices/pci0000:00/0000:00:18.3/hwmon/hwmon[0-9]*/temp1_input}
+TEMPSENSOR=${TEMPSENSOR:-/sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/temp1_input}
 
 # Which fans to control.
 # To control fans 1,4 and 6, set to [146] for example.
@@ -106,10 +106,10 @@ if ! ls /sys/bus/hid/drivers/corsair-cpro/[0-9A-Z:]*/hwmon/hwmon*/fan${FANS}_tar
     exit 1
 fi
 
-if [[ ! $SMOOTHDESCENT =~ ^[0-9]*$ ]] || [[ $SMOOTHDESCENT -gt 500 ]] || [[ $SMOOTHDESCENT -lt 1 ]]; then
+if [[ ! $SMOOTHDESCENT =~ ^[0-9]+$ ]] || [[ $SMOOTHDESCENT -gt 500 ]] || [[ $SMOOTHDESCENT -lt 1 ]]; then
     SMOOTHDESCENT=0
 fi
-if [[ ! $SMOOTHASCENT =~ ^[0-9]*$ ]] || [[ $SMOOTHASCENT -gt 500 ]] || [[ $SMOOTHASCENT -lt 1 ]]; then
+if [[ ! $SMOOTHASCENT =~ ^[0-9]+$ ]] || [[ $SMOOTHASCENT -gt 500 ]] || [[ $SMOOTHASCENT -lt 1 ]]; then
     SMOOTHASCENT=0
 fi
 
