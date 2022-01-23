@@ -51,11 +51,14 @@ FFMPEGTHREADS=${FFMPEGTHREADS:-0}
 # lixb265 CRF value ; ffmpeg default is 28, lower number results in higher image quality
 FFMPEGCRF=${FFMPEGCRF:-21}
 # libx265 preset value ; ffmpeg default is medium ; see x265 manual for valid values
-FFMPEGPRESET=${FFMPEGPRESET:-medium}
-# Extra options to send to ffmpeg. ; aq-mode=3 is better for 8 bit content
+FFMPEGPRESET=${FFMPEGPRESET:-slow}
+# Extra options to send to ffmpeg.
 # You can limit the amount of threads x265 uses with the pools parameter
 # For example -x265-params log-level=error:aq-mode=3:pools=2
-FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error}
+# https://x265.readthedocs.io/en/master/cli.html
+# https://x265.readthedocs.io/en/master/presets.html
+# https://forum.doom9.org/showthread.php?t=16881
+FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error::me=umh:rc-lookahead=30:aq-mode=3}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
 # Scales the video to DAR (display aspect ratio) if SAR (sample aspect ratio) and DAR are different.
@@ -199,7 +202,7 @@ while true; do
             continue
         fi
         # Remove resolution from filename, add new resolution / codec name.
-        ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9][0-9]{3,4}[pрP]([^A-Za-z0-9])/\1/g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.$OUTPUTEXTENSION/" | sed -E "s/ +/ /g")
+        ouFile=$(echo "$inFile" | sed -E "s/[^A-Za-z0-9][0-9]{3,4}[pрPiI]([^A-Za-z0-9])/\1/g" | sed -E "s/\.[^\.]+$/ ${OUTHEIGHT}p HEVC.$OUTPUTEXTENSION/" | sed -E "s/ +/ /g")
         success=0
         # If both the input and output files are still the same name, append _.
         if [[ "$inFile" == "$ouFile" ]]; then
