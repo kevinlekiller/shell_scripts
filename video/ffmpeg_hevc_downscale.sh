@@ -31,7 +31,7 @@ OUTPUTEXTENSION=${OUTPUTEXTENSION:-mkv}
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
 # Desired height of the output video in pixels.
 OUTHEIGHT=${OUTHEIGHT:-720}
-# Minimun allowed bitrate of input video @30fps
+# Minimum allowed bitrate of input video @30fps
 # If the video is 60fps for example, then this value is doubled.
 # Set to 1 to disable.
 MINBITRATE=${MINBITRATE:-3000}
@@ -58,7 +58,7 @@ FFMPEGPRESET=${FFMPEGPRESET:-slow}
 # https://x265.readthedocs.io/en/master/cli.html
 # https://x265.readthedocs.io/en/master/presets.html
 # https://forum.doom9.org/showthread.php?t=16881
-FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error::me=umh:rc-lookahead=30:aq-mode=3}
+FFMPEGEXTRA=${FFMPEGEXTRA:--x265-params log-level=error:me=umh:rc-lookahead=30:aq-mode=3}
 # -vf options to set to ffmpeg. ; lanczos results in a bit sharper downscaling
 FFMPEGVF=${FFMPEGVF:--vf scale=-2:$OUTHEIGHT:flags=lanczos}
 # Scales the video to DAR (display aspect ratio) if SAR (sample aspect ratio) and DAR are different.
