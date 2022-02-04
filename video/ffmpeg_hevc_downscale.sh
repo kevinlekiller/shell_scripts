@@ -78,8 +78,12 @@ CONVERSIONLOG=${CONVERSIONLOG:-~/.config/ffmpeg_downscale_$OUTHEIGHT.tsv}
 # Checks if video is interlaced and deinterlaces it.
 # Set the vf filter to pass to ffmpeg to enable. Set empty to disable deinterlacing.
 FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
+# If the file name contains this word, the file will be deinterlaced.
+# If not, the script will atempt to detect interlacing with the settings provided below.
+DEINTERLACEKEYWORD=${DEINTERLACEKEYWORD:-_DEINT_}
 # Set the amount of video frames to check for interlacing.
 # More frames increases accuracy, but takes longer to process.
+# Set to 0 to disable interlacing detection.
 DEINTERLACEFRAMES=${DEINTERLACEFRAMES:-600}
 # Set the threshold percentage to enable interlacing.
 # For example, if set to 40, then if 33% of the frames are interlaced, the
@@ -153,8 +157,8 @@ if [[ $DEINTERLACETHRES -gt 100 || $DEINTERLACETHRES -lt 1 ]]; then
     echoCol "Error: DEINTERLACETHRES must be a number from 1 to 100." red
     exit 1
 fi
-if [[ $DEINTERLACEFRAMES -lt 1 ]]; then
-    echoCol "Error: DEINTERLACEFRAMES must be at minimum 1." red
+if [[ $DEINTERLACEFRAMES -lt 0 ]]; then
+    echoCol "Error: DEINTERLACEFRAMES must be at minimum 0." red
     exit 1
 fi
 if [[ -n $CONVERSIONLOG ]] && [[ ! -f $CONVERSIONLOG ]]; then
@@ -170,8 +174,11 @@ fi
 cd "$1" || exit
 
 DEINTERLACETHRES=$(bc -l <<< "($DEINTERLACEFRAMES*0.$DEINTERLACETHRES)+0.5" | cut -d\. -f1)
+if [[ ! $DEINTERLACETHRES =~ ^[0-9]+$ ]]; then
+    $DEINTERLACETHRES=1
+fi
 function checkDeinterlace {
-    if [[ -z $FFMPEGVFD ]]; then
+    if [[ $DEINTERLACEFRAMES == 0 ]]; then
         return
     fi
     idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,$((900+$DEINTERLACEFRAMES))),setpts=PTS-STARTPTS",idet -frames:v $DEINTERLACEFRAMES -an -f null - -i "$inFile" 2>&1)"
@@ -180,7 +187,6 @@ function checkDeinterlace {
         NBFF=$(echo "$idetData" | grep -Poi "$frameType frame detection:.+?BFF:\s*\d+" | grep -Po "BFF:\s*\d+" | grep -Po "\d+")
         if [[ $((NTFF+NBFF)) -ge $DEINTERLACETHRES ]]; then
             INTERLACED=1
-            VFTEMP=$FFMPEGVFD
             return
         fi
     done
@@ -262,9 +268,11 @@ while true; do
             fi
             echoCol "MINBITRATE: Input Video bitrate ($bitRate kb/s) is higher than required minimum bitrate ($minBitRate kb/s <- (($frameRate)/30)*$MINBITRATE)." "green"
         fi
-        VFTEMP=$FFMPEGVF
         INTERLACED=0
-        checkDeinterlace
+        if [[ -n $FFMPEGVFD ]]; then
+            [[ $inFile =~ $DEINTERLACEKEYWORD ]] && INTERLACED=1 || checkDeinterlace
+        fi
+        [[ $INTERLACED == 1 ]] && VFTEMP=$FFMPEGVFD || VFTEMP=$FFMPEGVF
         SAR=$(echo "$details" | grep -Po "SAR \d+:\d+" | cut -d\  -f2)
         DAR=$(echo "$details" | grep -Po "DAR \d+:\d+" | cut -d\  -f2)
         if [[ $ASPECTCHANGE == 1 && $SAR != $DAR && $SAR =~ ^[0-9]+:[0-9]+$ && $DAR =~ ^[0-9]+:[0-9]+$ ]]; then
