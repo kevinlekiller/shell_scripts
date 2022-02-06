@@ -27,6 +27,8 @@ DELINFIL=${DELINFIL:-1}
 # File extension to use on the output file.
 # Affects which container ffmpeg will use.
 OUTPUTEXTENSION=${OUTPUTEXTENSION:-mkv}
+# If set to 1, files already encoded with HEVC will be skipped.
+SKIPHEVC=${SKIPHEVC:-1}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
 # Desired height of the output video in pixels.
@@ -236,7 +238,7 @@ while true; do
             fi
         fi
         details=$(ffprobe -hide_banner -select_streams v:0 -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
-        if [[ $details =~ codec_name=([xh]265|hevc) ]]; then
+        if [[ $SKIPHEVC == 1 ]] && [[ $details =~ codec_name=([xh]265|hevc) ]]; then
             echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
             if [[ -n $SKIPFILELOG ]]; then
                 if [[ ! $ouFile =~ "HEVC 720p HEVC" ]]; then
