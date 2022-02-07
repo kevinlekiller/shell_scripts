@@ -5,7 +5,22 @@ res=$(xrandr | grep -m1 -Po "connected.+\d+x\d+" | cut -d\  -f2)
 width=$(echo "$res" | cut -dx -f1)
 height=$(($(echo "$res" | cut -dx -f2)-44))
 res="${width}x${height}"
-unset width height
+
+# Clear sofalizer filter if file is mono or stereo.
+files=0
+for x in "$@"; do
+    if [[ -f $x ]]; then
+        if [[ $files -gt 0 ]]; then
+            AF=""
+            break
+        fi
+        if [[ $(ffprobe -hide_banner -loglevel quiet -show_entries stream=channels -select_streams a -of compact -i "$x" | grep -m1 -Po "channels=\d+"  | cut -d= -f2) =~ ^[12]$ ]]; then
+            AF="--af-clr"
+        fi
+        ((++files))
+    fi
+done
+unset width height files x
 
 # Use https://github.com/mpv-player/mpv-build for sofalizer.
 mpv=~/bin/.mpv
@@ -18,7 +33,7 @@ cmd=(
         --whitelist=~/TV --noblacklist=~/TV
         --whitelist="$mpv" --noblacklist="$mpv"
         --ignore=dbus
-        "$mpv" --autofit=$res "$@"
+        "$mpv" --autofit=$res $AF "$@"
 )
 echo "${cmd[@]}" | xargs
 "${cmd[@]}"
