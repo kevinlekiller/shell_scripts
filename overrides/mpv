@@ -5,22 +5,7 @@ res=$(xrandr | grep -m1 -Po "connected.+\d+x\d+" | cut -d\  -f2)
 width=$(echo "$res" | cut -dx -f1)
 height=$(($(echo "$res" | cut -dx -f2)-44))
 res="${width}x${height}"
-
-# Clear sofalizer filter if file is mono or stereo.
-files=0
-for x in "$@"; do
-    if [[ -f $x ]]; then
-        if [[ $files -gt 0 ]]; then
-            AF=""
-            break
-        fi
-        if [[ $(ffprobe -hide_banner -loglevel quiet -show_entries stream=channels -select_streams a -of compact -i "$x" | grep -m1 -Po "channels=\d+"  | cut -d= -f2) =~ ^[12]$ ]]; then
-            AF="--af-clr"
-        fi
-        ((++files))
-    fi
-done
-unset width height files x
+unset width height
 
 # Use https://github.com/mpv-player/mpv-build for sofalizer.
 mpv=~/bin/.mpv
@@ -28,12 +13,11 @@ cmd=(
     firejail
         --whitelist=~/.config/mpv --noblacklist=~/.config/mpv
         --whitelist=/run/media --noblacklist=/run/media
-        --whitelist=~/Documents/x --noblacklist=~/Documents/x
         --whitelist=~/Transfers --noblacklist=~/Transfers
         --whitelist=~/TV --noblacklist=~/TV
         --whitelist="$mpv" --noblacklist="$mpv"
         --ignore=dbus
-        "$mpv" --autofit=$res $AF "$@"
+        "$mpv" --autofit=$res "$@"
 )
 echo "${cmd[@]}" | xargs
 "${cmd[@]}"
