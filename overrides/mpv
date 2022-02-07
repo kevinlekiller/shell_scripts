@@ -1,20 +1,24 @@
 #!/bin/bash
 
+# Set autowidth to remove height of taskbar.
 res=$(xrandr | grep -m1 -Po "connected.+\d+x\d+" | cut -d\  -f2)
 width=$(echo "$res" | cut -dx -f1)
 height=$(($(echo "$res" | cut -dx -f2)-44))
 res="${width}x${height}"
 unset width height
 
+# Use https://github.com/mpv-player/mpv-build for sofalizer.
+mpv=~/bin/.mpv
 cmd=(
     firejail
         --whitelist=~/.config/mpv --noblacklist=~/.config/mpv
         --whitelist=/run/media --noblacklist=/run/media
         --whitelist=~/Documents/x --noblacklist=~/Documents/x
         --whitelist=~/Transfers --noblacklist=~/Transfers
-      	--whitelist=~/TV --noblacklist=~/TV
+        --whitelist=~/TV --noblacklist=~/TV
+        --whitelist="$mpv" --noblacklist="$mpv"
         --ignore=dbus
-        /usr/bin/mpv --autofit=$res "$@"
+        "$mpv" --autofit=$res "$@"
 )
 echo "${cmd[@]}" | xargs
 "${cmd[@]}"
