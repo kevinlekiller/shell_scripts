@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Set autowidth to remove height of taskbar.
-res=$(xrandr | grep -m1 -Po "connected.+\d+x\d+" | cut -d\  -f2)
-width=$(echo "$res" | cut -dx -f1)
-height=$(($(echo "$res" | cut -dx -f2)-44))
-res="${width}x${height}"
-unset width height
-
 # Use https://github.com/mpv-player/mpv-build for sofalizer.
 mpv=~/bin/.mpv
 cmd=(
@@ -17,7 +10,7 @@ cmd=(
         --whitelist=~/TV --noblacklist=~/TV
         --whitelist="$mpv" --noblacklist="$mpv"
         --ignore=dbus
-        "$mpv" --autofit=$res "$@"
+        "$mpv" "$@"
 )
 echo "${cmd[@]}" | xargs
 "${cmd[@]}"
