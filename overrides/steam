@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ ! -f ~/bin/.steam ]] && echo -ne '#!/bin/bash\ncd ~/Documents/SteamIdleMaster\nsteam "$@" &> /dev/null &\nbash\n' > ~/bin/.steam
+[[ ! -f ~/bin/.steam ]] && echo -ne '#!/bin/bash\ncd ~/Documents/SteamIdleMaster\nsteam "$@" &> /dev/null &\nbash\n' > ~/bin/.steam && chmod u+x ~/bin/.steam
 
 firejail \
 -ignore=seccomp \
