@@ -1,11 +1,20 @@
 #!/bin/bash
 
-firejail --private-tmp --ignore=seccomp\
-  --whitelist=~/.local/share/Steam --noblacklist=~/.local/share/Steam\
-  --whitelist=~/.cache/mesa_shader_cache --noblacklist=~/.cache/mesa_shader_cache\
-  --whitelist=~/.steam --noblacklist=~/.steam\
-  --whitelist=~/.steampath --noblacklist=~/.steampath\
-  --whitelist=~/.steampid --noblacklist=~/.steampid\
-  /usr/bin/steam "$@"
+[[ ! -f ~/bin/.steam ]] && echo -ne '#!/bin/bash\ncd ~/Documents/SteamIdleMaster\nsteam "$@" &> /dev/null &\nbash\n' > ~/bin/.steam
 
-exit $?
+firejail \
+-ignore=seccomp \
+--noblacklist=~/.config/vkBasalt \
+--whitelist=~/.config/vkBasalt \
+--noblacklist=~/.reshade \
+--whitelist=~/.reshade \
+--whitelist=~/.cache/mesa_shader_cache \
+--noblacklist=~/.cache/mesa_shader_cache \
+--noblacklist=~/.config/MangoHud/MangoHud.conf \
+--whitelist=~/.config/MangoHud/MangoHud.conf \
+--noblacklist=~/Documents/SteamIdleMaster \
+--whitelist=~/Documents/SteamIdleMaster \
+--noblacklist=~/bin/.steam \
+--whitelist=~/bin/.steam \
+--profile=steam bash \
+-c ~/bin/.steam "$@"
