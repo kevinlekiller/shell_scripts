@@ -28,7 +28,7 @@ DELINFIL=${DELINFIL:-1}
 # Affects which container ffmpeg will use.
 OUTPUTEXTENSION=${OUTPUTEXTENSION:-mkv}
 # If set to 1, files already encoded with HEVC will be skipped.
-SKIPHEVC=${SKIPHEVC:-1}
+SKIPHEVC=${SKIPHEVC:-0}
 # Skip files / folders which contain this word in the name.
 SKIPFILEMATCH=${SKIPFILEMATCH:-SKIPIT}
 # Desired height of the output video in pixels.
@@ -53,7 +53,7 @@ FFMPEGTHREADS=${FFMPEGTHREADS:-0}
 # lixb265 CRF value ; ffmpeg default is 28, lower number results in higher image quality
 FFMPEGCRF=${FFMPEGCRF:-21}
 # libx265 preset value ; ffmpeg default is medium ; see x265 manual for valid values
-FFMPEGPRESET=${FFMPEGPRESET:-slow}
+FFMPEGPRESET=${FFMPEGPRESET:-medium}
 # Extra options to send to ffmpeg.
 # You can limit the amount of threads x265 uses with the pools parameter
 # For example -x265-params log-level=error:aq-mode=3:pools=2
@@ -198,6 +198,7 @@ shopt -s globstar nocasematch
 while true; do
     filesProcessed=0
     for inFile in **; do
+        inFile="$(realpath "$inFile")"
         if [[ ! -f $inFile ]]; then
             continue
         fi
@@ -237,7 +238,7 @@ while true; do
                 rmdir "$ouFile"
             fi
         fi
-        details=$(ffprobe -hide_banner -select_streams v:0 -show_entries stream=width,height,codec_name,r_frame_rate "$inFile" 2>&1)
+        details=$(ffprobe -hide_banner -select_streams v:0 -show_entries stream=width,height,codec_name,r_frame_rate -i "$inFile" 2>&1)
         if [[ $SKIPHEVC == 1 ]] && [[ $details =~ codec_name=([xh]265|hevc) ]]; then
             echoCol "Codec is $(echo "$details" | grep -Po "codec_name=([xh]265|hevc)" | cut -d= -f2) for file \"$inFile\". Skipping." "blue"
             if [[ -n $SKIPFILELOG ]]; then
