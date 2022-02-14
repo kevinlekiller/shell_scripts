@@ -83,6 +83,8 @@ FFMPEGVFD=${FFMPEGVFD:--vf estdif,scale=-2:$OUTHEIGHT:flags=lanczos}
 # If the file name contains this word, the file will be deinterlaced.
 # If not, the script will atempt to detect interlacing with the settings provided below.
 DEINTERLACEKEYWORD=${DEINTERLACEKEYWORD:-_DEINT_}
+# If the file name contains this word, interlacing check will not be done on the file.
+NODEINTERLACEKEYWORD=${NODEINTERLACEKEYWORD:-_NODEINT_}
 # Set the amount of video frames to check for interlacing.
 # More frames increases accuracy, but takes longer to process.
 # Set to 0 to disable interlacing detection.
@@ -180,7 +182,7 @@ if [[ ! $DEINTERLACETHRES =~ ^[0-9]+$ ]]; then
     $DEINTERLACETHRES=1
 fi
 function checkDeinterlace {
-    if [[ $DEINTERLACEFRAMES == 0 ]]; then
+    if [[ $inFile =~ $NODEINTERLACEKEYWORD || $DEINTERLACEFRAMES == 0 ]]; then
         return
     fi
     idetData="$(ffmpeg -nostdin -y -hide_banner -vf select="between(n\,900\,$((900+$DEINTERLACEFRAMES))),setpts=PTS-STARTPTS",idet -frames:v $DEINTERLACEFRAMES -an -f null - -i "$inFile" 2>&1)"
