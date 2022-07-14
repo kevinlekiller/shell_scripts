@@ -44,9 +44,9 @@ if which pmm &> /dev/null; then
 elif [[ -f /usr/lib/os-release ]] && which zypper &> /dev/null; then
     sudo zypper refresh
     if grep -qi "openSUSE Leap" /usr/lib/os-release; then
-        sudo zypper up
+        sudo zypper up --no-recommends
     elif grep -qi "openSUSE Tumbleweed" /usr/lib/os-release; then
-        sudo zypper dup
+        sudo zypper dup --no-recommends
     fi
 elif which yay &> /dev/null; then
     yay -Syu
